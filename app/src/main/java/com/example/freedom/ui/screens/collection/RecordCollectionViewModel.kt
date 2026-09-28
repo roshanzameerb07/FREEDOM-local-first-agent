@@ -78,7 +78,9 @@ class RecordCollectionViewModel(
             quantityStr = state.quantity,
             fatStr = state.fat,
             snfStr = state.snf,
-            paymentStatus = if (state.isPaymentRecorded) MilkRecordEntity.PAYMENT_RECORDED_LOCALLY else MilkRecordEntity.PAYMENT_PENDING
+            paymentStatus = if (state.isPaymentRecorded) MilkRecordEntity.PAYMENT_RECORDED_LOCALLY else MilkRecordEntity.PAYMENT_PENDING,
+            paymentMethod = if (state.isPaymentRecorded) state.paymentMethod else null,
+            paymentReference = if (state.isPaymentRecorded) state.paymentReference else null
         )
         if (!validation.isValid) {
             _uiState.update { it.copy(validationResult = validation) }
@@ -101,9 +103,10 @@ class RecordCollectionViewModel(
             val paymentStatus = if (state.isPaymentRecorded) MilkRecordEntity.PAYMENT_RECORDED_LOCALLY else MilkRecordEntity.PAYMENT_PENDING
             val now = System.currentTimeMillis()
 
+            val profile = com.example.freedom.domain.model.WorkerProfileRepository.getProfile()
             val record = MilkRecordEntity(
-                orgId = "ORG001",
-                workerId = "WORKER001",
+                orgId = profile.organizationId,
+                workerId = profile.workerId,
                 farmerName = state.farmerName.trim(),
                 quantity = q,
                 fat = f,

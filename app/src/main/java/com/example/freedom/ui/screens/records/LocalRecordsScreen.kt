@@ -189,7 +189,10 @@ fun LocalRecordsScreen(
 
     // Payment Recording Dialog
     paymentDialogRecord?.let { record ->
-        val amount = record.payableAmount ?: (record.quantity * 37.5)
+        val amount = record.payableAmount ?: MilkRecordEntity.calculatePayableAmount(record.quantity, record.fat, record.snf)
+        val isRefRequired = selectedMethod == MilkRecordEntity.METHOD_UPI || selectedMethod == MilkRecordEntity.METHOD_BANK_TRANSFER
+        val isRefMissing = isRefRequired && referenceInput.isBlank()
+
         AlertDialog(
             onDismissRequest = { paymentDialogRecord = null },
             title = {
@@ -240,15 +243,21 @@ fun LocalRecordsScreen(
                     OutlinedTextField(
                         value = referenceInput,
                         onValueChange = { referenceInput = it },
-                        label = { Text("Reference / Receipt Number") },
-                        placeholder = { Text("e.g. REC-102") },
+                        label = { Text(if (isRefRequired) "Reference / Transaction ID (Mandatory)" else "Receipt / Reference (Optional)") },
+                        placeholder = { Text(if (isRefRequired) "e.g. UPI-98421 or Bank Txn ID" else "e.g. REC-102") },
+                        isError = isRefMissing,
+                        supportingText = {
+                            if (isRefMissing) {
+                                Text("Transaction / Reference ID is required for $selectedMethod", color = MaterialTheme.colorScheme.error)
+                            }
+                        },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Saved locally on device. Awaiting bank reconciliation.",
+                        text = "Recorded locally • Awaiting bank reconciliation upon sync.",
                         style = MaterialTheme.typography.labelSmall,
                         color = TextSecondary
                     )
@@ -260,6 +269,7 @@ fun LocalRecordsScreen(
                         viewModel.recordPayment(record.id, selectedMethod, referenceInput)
                         paymentDialogRecord = null
                     },
+                    enabled = !isRefMissing,
                     colors = ButtonDefaults.buttonColors(containerColor = PrimaryGreen)
                 ) {
                     Text("Save Payment")
@@ -282,7 +292,7 @@ fun RecordCardItem(
     val dateFormat = remember { SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault()) }
     val formattedDate = remember(record.createdAt) { dateFormat.format(Date(record.createdAt)) }
     val isPending = record.paymentStatus == MilkRecordEntity.PAYMENT_PENDING
-    val amount = record.payableAmount ?: (record.quantity * 37.5)
+    val amount = record.payableAmount ?: MilkRecordEntity.calculatePayableAmount(record.quantity, record.fat, record.snf)
 
     Card(
         modifier = Modifier.fillMaxWidth(),

@@ -281,6 +281,82 @@ class LocalDeterministicQueryEngineTest {
         assertEquals(675.0, updated.amountPaid ?: 0.0, 0.001)
     }
 
+    // 10. Intent Safety Gate Tests (Task 2 & 4 Verification)
+    @Test
+    fun `applyIntentSafetyGate redirects payment policy query from GET_WORKER_PROFILE to SEARCH_LOCAL_KNOWLEDGE`() {
+        val prompt = "When is payment considered complete?"
+        val misclassifiedRequest = ToolRequest(
+            intent = ToolIntent.GET_WORKER_PROFILE,
+            args = emptyMap(),
+            needsConfirmation = false,
+            executionMode = ExecutionMode.GEMMA_EXECUTED
+        )
+
+        val gatedRequest = queryEngine.applyIntentSafetyGate(misclassifiedRequest, prompt)
+        assertEquals(ToolIntent.SEARCH_LOCAL_KNOWLEDGE, gatedRequest.intent)
+        assertEquals(prompt, gatedRequest.args["query"])
+        assertEquals(ExecutionMode.RAG_EXECUTION, gatedRequest.executionMode)
+    }
+
+    @Test
+    fun `applyIntentSafetyGate redirects payment policy query from GET_ORGANIZATION_INFO to SEARCH_LOCAL_KNOWLEDGE`() {
+        val prompt = "When is payment considered complete?"
+        val misclassifiedRequest = ToolRequest(
+            intent = ToolIntent.GET_ORGANIZATION_INFO,
+            args = emptyMap(),
+            needsConfirmation = false,
+            executionMode = ExecutionMode.GEMMA_EXECUTED
+        )
+
+        val gatedRequest = queryEngine.applyIntentSafetyGate(misclassifiedRequest, prompt)
+        assertEquals(ToolIntent.SEARCH_LOCAL_KNOWLEDGE, gatedRequest.intent)
+        assertEquals(prompt, gatedRequest.args["query"])
+    }
+
+    @Test
+    fun `applyIntentSafetyGate routes What is my ID to GET_WORKER_PROFILE`() {
+        val prompt = "What is my ID?"
+        val request = ToolRequest(
+            intent = ToolIntent.UNKNOWN_OR_UNSUPPORTED,
+            args = emptyMap(),
+            needsConfirmation = false
+        )
+
+        val gatedRequest = queryEngine.applyIntentSafetyGate(request, prompt)
+        assertEquals(ToolIntent.GET_WORKER_PROFILE, gatedRequest.intent)
+    }
+
+    @Test
+    fun `applyIntentSafetyGate routes Who has pending payments to GET_PENDING_PAYMENTS`() {
+        val prompt = "Who has pending payments?"
+        val request = ToolRequest(
+            intent = ToolIntent.UNKNOWN_OR_UNSUPPORTED,
+            args = emptyMap(),
+            needsConfirmation = false
+        )
+
+        val gatedRequest = queryEngine.applyIntentSafetyGate(request, prompt)
+        assertEquals(ToolIntent.GET_PENDING_PAYMENTS, gatedRequest.intent)
+    }
+
+    @Test
+    fun `parseGemmaResponse applies safety gate and routes payment completion question to RAG`() {
+        val prompt = "When is payment considered complete?"
+        // Simulate Gemma misclassifying to GET_ORGANIZATION_INFO
+        val rawJson = """
+            {
+              "intent": "GET_ORGANIZATION_INFO",
+              "args": {},
+              "needsConfirmation": false
+            }
+        """.trimIndent()
+
+        val parsed = queryEngine.parseGemmaResponse(rawJson, prompt)
+        assertNotNull(parsed)
+        assertEquals(ToolIntent.SEARCH_LOCAL_KNOWLEDGE, parsed!!.intent)
+        assertEquals(prompt, parsed.args["query"])
+    }
+
     private class FakeMilkRecordRepository : MilkRecordRepository {
         val insertedRecords = mutableListOf<MilkRecordEntity>()
 

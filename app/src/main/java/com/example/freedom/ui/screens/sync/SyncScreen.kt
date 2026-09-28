@@ -37,12 +37,12 @@ fun SyncScreen(
                 title = {
                     Column {
                         Text(
-                            text = "Batch Sync",
+                            text = "Send Data",
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
                         Text(
-                            text = "Controlled Upload Simulation",
+                            text = "Upload collections when connected",
                             style = MaterialTheme.typography.bodySmall,
                             color = Color.White.copy(alpha = 0.85f)
                         )
@@ -71,7 +71,7 @@ fun SyncScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
-            // Explicit Simulation Disclaimer Banner
+            // Explicit Prototype Disclaimer Banner
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = PendingAmberBg,
@@ -90,7 +90,7 @@ fun SyncScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Local Batch Sync (Simulation / Demo Mode)",
+                            text = "Local Prototype",
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Bold,
                             color = PendingAmber
@@ -98,7 +98,7 @@ fun SyncScreen(
                     }
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "FREEDOM operates strictly local-first. No external cloud backend or company server is connected in this prototype. Records stay on device SQLite.",
+                        text = "FREEDOM operates strictly local-first. All records stay on this phone. This prototype does not connect to a real company server. Tapping Send Data marks records as sent locally for demonstration.",
                         style = MaterialTheme.typography.bodySmall,
                         color = TextPrimary,
                         lineHeight = 16.sp
@@ -119,7 +119,7 @@ fun SyncScreen(
                     modifier = Modifier.padding(18.dp)
                 ) {
                     Text(
-                        text = "Synchronization Overview",
+                        text = "Transfer Status",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
@@ -128,7 +128,7 @@ fun SyncScreen(
                     Spacer(modifier = Modifier.height(14.dp))
 
                     SyncStatusRow(
-                        label = "Today's Records",
+                        label = "Today's Collections",
                         value = "${uiState.todayRecordsCount} entries",
                         icon = Icons.AutoMirrored.Filled.ReceiptLong,
                         iconTint = PrimaryGreen
@@ -137,7 +137,7 @@ fun SyncScreen(
                     HorizontalDivider(color = OutlineColor.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 10.dp))
 
                     SyncStatusRow(
-                        label = "Pending Upload Count",
+                        label = "Records Ready to Send",
                         value = "${uiState.pendingUploadCount} records",
                         icon = Icons.Default.CloudQueue,
                         iconTint = PendingAmber
@@ -155,7 +155,7 @@ fun SyncScreen(
                     HorizontalDivider(color = OutlineColor.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 10.dp))
 
                     SyncStatusRow(
-                        label = "Upload Window",
+                        label = "Shift Window",
                         value = uiState.uploadWindow,
                         icon = Icons.Default.Schedule,
                         iconTint = InfoBlue
@@ -176,18 +176,18 @@ fun SyncScreen(
                     modifier = Modifier.padding(16.dp)
                 ) {
                     Text(
-                        text = "Local-First Sync Architecture",
+                        text = "How Local Sync Works",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = OnPrimaryContainer
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    SyncArchitectureStep(number = "1", title = "Local SQLite", description = "Source of truth stored on device")
+                    SyncArchitectureStep(number = "1", title = "Saved on Phone", description = "All collection records saved locally on device")
                     Spacer(modifier = Modifier.height(6.dp))
-                    SyncArchitectureStep(number = "2", title = "Demo Batch Packaging", description = "Bundles prepared when connectivity permits (Simulation)")
+                    SyncArchitectureStep(number = "2", title = "Ready to Send", description = "Records prepared for batch transfer when connected")
                     Spacer(modifier = Modifier.height(6.dp))
-                    SyncArchitectureStep(number = "3", title = "Status Transition", description = "Local records transitioned to UPLOADED status (Simulation)")
+                    SyncArchitectureStep(number = "3", title = "Marked as Sent", description = "Records updated locally to prevent duplicate entries")
                 }
             }
 
@@ -210,12 +210,12 @@ fun SyncScreen(
                         strokeWidth = 2.dp
                     )
                     Spacer(modifier = Modifier.width(10.dp))
-                    Text("Simulating Batch Processing...")
+                    Text("Sending Records Locally...")
                 } else {
                     Icon(Icons.Default.Sync, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Upload Daily Batch (Simulate)",
+                        text = "Send Data",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )

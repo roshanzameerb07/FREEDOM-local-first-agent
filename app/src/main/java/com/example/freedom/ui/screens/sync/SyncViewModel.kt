@@ -61,9 +61,9 @@ class SyncViewModel(
             val updatedCount = repository.simulateBatchSync()
 
             _syncMessage.value = if (updatedCount > 0) {
-                "Simulation complete: $updatedCount pending record(s) transitioned to 'UPLOADED' status locally. (No remote server contacted)."
+                "Sent $updatedCount record(s) locally. Note: No external server was contacted."
             } else {
-                "Simulation complete: All records are already up to date locally (0 pending records). (No remote server contacted)."
+                "All records are already marked as sent locally (0 pending). Note: No external server was contacted."
             }
             _isSyncing.value = false
         }

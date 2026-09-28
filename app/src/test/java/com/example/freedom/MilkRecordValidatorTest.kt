@@ -106,4 +106,72 @@ class MilkRecordValidatorTest {
         assertFalse(result.isValid)
         assertNotNull(result.paymentStatusError)
     }
+
+    @Test
+    fun `validate UPI requires non-blank payment reference`() {
+        val missingRefResult = validator.validate(
+            farmerName = "Ramesh",
+            quantityStr = "18.0",
+            fatStr = "4.2",
+            snfStr = "8.6",
+            paymentStatus = "PAID",
+            paymentMethod = "UPI",
+            paymentReference = ""
+        )
+        assertFalse(missingRefResult.isValid)
+        assertEquals("Reference / Transaction ID is required for UPI", missingRefResult.paymentReferenceError)
+
+        val validRefResult = validator.validate(
+            farmerName = "Ramesh",
+            quantityStr = "18.0",
+            fatStr = "4.2",
+            snfStr = "8.6",
+            paymentStatus = "PAID",
+            paymentMethod = "UPI",
+            paymentReference = "UPI-12345"
+        )
+        assertTrue(validRefResult.isValid)
+        assertNull(validRefResult.paymentReferenceError)
+    }
+
+    @Test
+    fun `validate Bank Transfer requires non-blank payment reference`() {
+        val missingRefResult = validator.validate(
+            farmerName = "Ramesh",
+            quantityStr = "18.0",
+            fatStr = "4.2",
+            snfStr = "8.6",
+            paymentStatus = "RECORDED_LOCALLY",
+            paymentMethod = "BANK_TRANSFER",
+            paymentReference = "   "
+        )
+        assertFalse(missingRefResult.isValid)
+        assertEquals("Reference / Transaction ID is required for BANK_TRANSFER", missingRefResult.paymentReferenceError)
+
+        val validRefResult = validator.validate(
+            farmerName = "Ramesh",
+            quantityStr = "18.0",
+            fatStr = "4.2",
+            snfStr = "8.6",
+            paymentStatus = "RECORDED_LOCALLY",
+            paymentMethod = "BANK_TRANSFER",
+            paymentReference = "NEFT-776655"
+        )
+        assertTrue(validRefResult.isValid)
+    }
+
+    @Test
+    fun `validate Cash allows optional payment reference`() {
+        val cashWithoutRef = validator.validate(
+            farmerName = "Ramesh",
+            quantityStr = "18.0",
+            fatStr = "4.2",
+            snfStr = "8.6",
+            paymentStatus = "PAID",
+            paymentMethod = "CASH",
+            paymentReference = ""
+        )
+        assertTrue(cashWithoutRef.isValid)
+        assertNull(cashWithoutRef.paymentReferenceError)
+    }
 }

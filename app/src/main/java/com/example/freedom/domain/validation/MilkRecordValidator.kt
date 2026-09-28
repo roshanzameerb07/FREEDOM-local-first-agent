@@ -6,7 +6,8 @@ data class MilkRecordValidationResult(
     val quantityError: String? = null,
     val fatError: String? = null,
     val snfError: String? = null,
-    val paymentStatusError: String? = null
+    val paymentStatusError: String? = null,
+    val paymentReferenceError: String? = null
 )
 
 class MilkRecordValidator {
@@ -16,13 +17,16 @@ class MilkRecordValidator {
         quantityStr: String,
         fatStr: String,
         snfStr: String,
-        paymentStatus: String
+        paymentStatus: String,
+        paymentMethod: String? = null,
+        paymentReference: String? = null
     ): MilkRecordValidationResult {
         var farmerNameError: String? = null
         var quantityError: String? = null
         var fatError: String? = null
         var snfError: String? = null
         var paymentStatusError: String? = null
+        var paymentReferenceError: String? = null
 
         // 1. Farmer Name validation
         val trimmedName = farmerName.trim()
@@ -79,11 +83,21 @@ class MilkRecordValidator {
             paymentStatusError = "Please select a payment status (Pending or Paid)"
         }
 
+        // 6. Payment Reference validation for UPI & Bank Transfer
+        val isRecordedPayment = paymentStatus.trim().uppercase() in listOf("PAID", "RECORDED_LOCALLY", "COMPLETE")
+        if (isRecordedPayment && paymentMethod != null) {
+            val isElectronic = paymentMethod.trim().uppercase() in listOf("UPI", "BANK_TRANSFER", "BANK")
+            if (isElectronic && paymentReference.isNullOrBlank()) {
+                paymentReferenceError = "Reference / Transaction ID is required for $paymentMethod"
+            }
+        }
+
         val isValid = farmerNameError == null &&
                 quantityError == null &&
                 fatError == null &&
                 snfError == null &&
-                paymentStatusError == null
+                paymentStatusError == null &&
+                paymentReferenceError == null
 
         return MilkRecordValidationResult(
             isValid = isValid,
@@ -91,7 +105,8 @@ class MilkRecordValidator {
             quantityError = quantityError,
             fatError = fatError,
             snfError = snfError,
-            paymentStatusError = paymentStatusError
+            paymentStatusError = paymentStatusError,
+            paymentReferenceError = paymentReferenceError
         )
     }
 }

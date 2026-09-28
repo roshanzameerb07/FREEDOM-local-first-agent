@@ -186,7 +186,7 @@ class LocalDeterministicQueryEngine(
                 needsConfirmationExplicit
             }
 
-            return ToolRequest(
+            val baseRequest = ToolRequest(
                 intent = validatedIntent,
                 args = reconciledArgs,
                 rawArgs = rawArgsMap,
@@ -194,9 +194,117 @@ class LocalDeterministicQueryEngine(
                 clarificationQuestion = question,
                 executionMode = ExecutionMode.GEMMA_EXECUTED
             )
+
+            return applyIntentSafetyGate(baseRequest, userPrompt)
         } catch (e: Exception) {
             return null
         }
+    }
+
+    /**
+     * Deterministic Intent-Consistency and Safety Gate.
+     * Prevents Gemma model hallucinations or misclassifications from routing
+     * policy/knowledge questions to DB tools or worker profile tools.
+     */
+    fun applyIntentSafetyGate(request: ToolRequest, userPrompt: String): ToolRequest {
+        val lowerPrompt = userPrompt.lowercase().trim()
+        if (lowerPrompt.isEmpty()) return request
+
+        // 0. Record Creation must never be overridden by queries
+        val isRecordCreation = request.intent == ToolIntent.CREATE_MILK_RECORD ||
+                (lowerPrompt.contains("gave") && (lowerPrompt.contains("litre") || lowerPrompt.contains("liter") || lowerPrompt.contains("l"))) ||
+                (lowerPrompt.contains("litres") && lowerPrompt.contains("fat"))
+
+        if (isRecordCreation) {
+            return request
+        }
+
+        // 1. RAG Policy / Rule / Standard queries:
+        // Policy and rule questions MUST route to SEARCH_LOCAL_KNOWLEDGE, never GET_WORKER_PROFILE or GET_ORGANIZATION_INFO
+        val isPaymentPolicyQuestion = (lowerPrompt.contains("payment") || lowerPrompt.contains("paid")) &&
+                (lowerPrompt.contains("complete") || lowerPrompt.contains("settled") || lowerPrompt.contains("rule") ||
+                 lowerPrompt.contains("procedure") || lowerPrompt.contains("policy") || lowerPrompt.contains("when is") ||
+                 lowerPrompt.contains("how is") || lowerPrompt.contains("timeline") || lowerPrompt.contains("cycle"))
+
+        val isGeneralPolicyQuestion = lowerPrompt.contains("quality standard") ||
+                lowerPrompt.contains("milk standard") ||
+                (lowerPrompt.contains("minimum") && (lowerPrompt.contains("fat") || lowerPrompt.contains("snf"))) ||
+                lowerPrompt.contains("rejected milk") || lowerPrompt.contains("rejection") ||
+                lowerPrompt.contains("spoilage") || lowerPrompt.contains("sour milk") ||
+                lowerPrompt.contains("curdled") || lowerPrompt.contains("sync protocol") ||
+                lowerPrompt.contains("sync policy") || lowerPrompt.contains("offline limit") ||
+                lowerPrompt.contains("storage quota") || lowerPrompt.contains("cooperative rule") ||
+                lowerPrompt.contains("cooperative policy")
+
+        if (isPaymentPolicyQuestion || isGeneralPolicyQuestion) {
+            return request.copy(
+                intent = ToolIntent.SEARCH_LOCAL_KNOWLEDGE,
+                args = mapOf("query" to userPrompt),
+                needsConfirmation = false,
+                executionMode = ExecutionMode.RAG_EXECUTION
+            )
+        }
+
+        // 2. Worker Identity queries:
+        val isWorkerProfileQuestion = lowerPrompt.contains("officer id") ||
+                lowerPrompt.contains("worker id") ||
+                lowerPrompt.contains("what is my id") ||
+                lowerPrompt.contains("my officer id") ||
+                lowerPrompt.contains("my id") ||
+                lowerPrompt.contains("who am i") ||
+                lowerPrompt.contains("assigned area") ||
+                lowerPrompt.contains("my center") ||
+                lowerPrompt.contains("my route") ||
+                lowerPrompt.contains("my profile")
+
+        if (isWorkerProfileQuestion) {
+            return request.copy(
+                intent = ToolIntent.GET_WORKER_PROFILE,
+                args = emptyMap(),
+                needsConfirmation = false
+            )
+        }
+
+        // 3. Organization Info queries:
+        val isOrgQuestion = (lowerPrompt.contains("organization") || lowerPrompt.contains("cooperative name") ||
+                lowerPrompt.contains("which union") || lowerPrompt.contains("registration number")) &&
+                !lowerPrompt.contains("payment") && !lowerPrompt.contains("standard")
+
+        if (isOrgQuestion) {
+            return request.copy(
+                intent = ToolIntent.GET_ORGANIZATION_INFO,
+                args = emptyMap(),
+                needsConfirmation = false
+            )
+        }
+
+        // 4. Pending payments queries:
+        val isPendingPaymentsQuestion = (lowerPrompt.contains("pending") || lowerPrompt.contains("unpaid") || lowerPrompt.contains("due")) &&
+                (lowerPrompt.contains("payment") || lowerPrompt.contains("who has"))
+
+        if (isPendingPaymentsQuestion && !isPaymentPolicyQuestion) {
+            return request.copy(
+                intent = ToolIntent.GET_PENDING_PAYMENTS,
+                args = emptyMap(),
+                needsConfirmation = false
+            )
+        }
+
+        // 5. Farmers covered queries:
+        val isFarmersCoveredQuestion = lowerPrompt.contains("how many farmers") ||
+                lowerPrompt.contains("farmers covered") ||
+                lowerPrompt.contains("farmers visited")
+
+        if (isFarmersCoveredQuestion) {
+            val period = if (lowerPrompt.contains("week")) "week" else "today"
+            return request.copy(
+                intent = ToolIntent.COUNT_FARMERS_COVERED,
+                args = mapOf("period" to period),
+                needsConfirmation = false
+            )
+        }
+
+        return request
     }
 
     /**
@@ -236,7 +344,8 @@ class LocalDeterministicQueryEngine(
         // 2. GET_WORKER_PROFILE fallback
         if (lowerPrompt.contains("officer id") || lowerPrompt.contains("worker id") ||
             lowerPrompt.contains("who am i") || lowerPrompt.contains("assigned area") ||
-            lowerPrompt.contains("my center") || lowerPrompt.contains("my profile")
+            lowerPrompt.contains("my center") || lowerPrompt.contains("my profile") ||
+            lowerPrompt.contains("what is my id") || lowerPrompt.contains("my id")
         ) {
             return LocalEngineResult.ToolResult(
                 ToolRequest(ToolIntent.GET_WORKER_PROFILE, emptyMap(), needsConfirmation = false, executionMode = mode)
@@ -316,11 +425,17 @@ class LocalDeterministicQueryEngine(
         }
 
         // 11. SEARCH_LOCAL_KNOWLEDGE fallback (RAG)
-        if (lowerPrompt.contains("payment") && (lowerPrompt.contains("complete") || lowerPrompt.contains("settled") || lowerPrompt.contains("rule")) ||
-            lowerPrompt.contains("quality standard") || lowerPrompt.contains("acceptance") ||
-            lowerPrompt.contains("rejected milk") || lowerPrompt.contains("spoilage") ||
-            lowerPrompt.contains("sync protocol") || lowerPrompt.contains("quota")
-        ) {
+        val isPaymentPolicy = (lowerPrompt.contains("payment") || lowerPrompt.contains("paid")) &&
+                (lowerPrompt.contains("complete") || lowerPrompt.contains("settled") || lowerPrompt.contains("rule") ||
+                 lowerPrompt.contains("procedure") || lowerPrompt.contains("policy") || lowerPrompt.contains("when is") ||
+                 lowerPrompt.contains("timeline") || lowerPrompt.contains("cycle"))
+        val isGeneralPolicy = lowerPrompt.contains("quality standard") || lowerPrompt.contains("milk standard") ||
+                lowerPrompt.contains("rejected milk") || lowerPrompt.contains("rejection") ||
+                lowerPrompt.contains("spoilage") || lowerPrompt.contains("sour milk") ||
+                lowerPrompt.contains("sync protocol") || lowerPrompt.contains("sync policy") ||
+                lowerPrompt.contains("offline limit") || lowerPrompt.contains("quota") ||
+                lowerPrompt.contains("acceptance")
+        if (isPaymentPolicy || isGeneralPolicy) {
             return LocalEngineResult.ToolResult(
                 ToolRequest(ToolIntent.SEARCH_LOCAL_KNOWLEDGE, mapOf("query" to userPrompt), needsConfirmation = false, executionMode = ExecutionMode.RAG_EXECUTION)
             )

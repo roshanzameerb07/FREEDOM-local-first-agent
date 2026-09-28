@@ -90,23 +90,28 @@ fun AskFreedomScreen(
 
             // Suggestion Chips Header
             Text(
-                text = "Try asking:",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = TextSecondary
+                text = "Try an example",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = TextPrimary
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Quick Question Chips Row
+            // ASK Section
+            Text(
+                text = "ASK",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = PrimaryGreenDark,
+                letterSpacing = 1.sp
+            )
+            Spacer(modifier = Modifier.height(6.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                QuickQueryChip("Ramesh gave 18.5 litres, fat 4.2 and SNF 8.6") {
-                    viewModel.submitQuery(it)
-                }
                 QuickQueryChip("How much did Ramesh give this week?") {
                     viewModel.submitQuery(it)
                 }
@@ -119,7 +124,29 @@ fun AskFreedomScreen(
                 QuickQueryChip("When is payment considered complete?") {
                     viewModel.submitQuery(it)
                 }
-                QuickQueryChip("What is my officer ID?") {
+                QuickQueryChip("What is my ID?") {
+                    viewModel.submitQuery(it)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // RECORD Section
+            Text(
+                text = "RECORD",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = InfoBlue,
+                letterSpacing = 1.sp
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                QuickQueryChip("Ramesh gave 10 litres, fat 4.2 and SNF 8.6.") {
                     viewModel.submitQuery(it)
                 }
             }
@@ -413,6 +440,10 @@ fun AdaptiveResultCard(result: ToolExecutor.ExecutionResult) {
                     RagResultContent(result)
                 }
 
+                result.capabilityUsed == "SEARCH_LOCAL_KNOWLEDGE" -> {
+                    RagRefusalContent(result)
+                }
+
                 // 2. Numeric / Summary Capability
                 result.capabilityUsed in listOf("COUNT_FARMERS_COVERED", "GET_WEEKLY_WORKER_SUMMARY", "GET_TODAY_SUMMARY", "GET_TODAY_WORKER_SUMMARY") -> {
                     NumericSummaryContent(result)
@@ -531,6 +562,34 @@ fun RagResultContent(result: ToolExecutor.ExecutionResult) {
 }
 
 @Composable
+fun RagRefusalContent(result: ToolExecutor.ExecutionResult) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            imageVector = Icons.Default.Info,
+            contentDescription = null,
+            tint = PendingAmber,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = "Policy Not Found",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = PendingAmber
+        )
+    }
+
+    Spacer(modifier = Modifier.height(10.dp))
+
+    Text(
+        text = result.summary,
+        style = MaterialTheme.typography.bodyLarge,
+        color = TextPrimary,
+        lineHeight = 22.sp
+    )
+}
+
+@Composable
 fun NumericSummaryContent(result: ToolExecutor.ExecutionResult) {
     Text(
         text = result.summary,
@@ -630,7 +689,7 @@ fun PendingPaymentsContent(result: ToolExecutor.ExecutionResult) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             val dateFormat = SimpleDateFormat("dd MMM", Locale.getDefault())
             result.records.take(5).forEach { record ->
-                val amount = record.payableAmount ?: (record.quantity * 37.5)
+                val amount = record.payableAmount ?: MilkRecordEntity.calculatePayableAmount(record.quantity, record.fat, record.snf)
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(8.dp),

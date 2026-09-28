@@ -91,9 +91,10 @@ class ToolExecutor(
                 val calculatedAmount = MilkRecordEntity.calculatePayableAmount(quantity, fat, snf)
                 val now = System.currentTimeMillis()
 
+                val currentProfile = WorkerProfileRepository.getProfile()
                 val entity = MilkRecordEntity(
-                    orgId = "ORG001",
-                    workerId = "WORKER001",
+                    orgId = currentProfile.organizationId,
+                    workerId = currentProfile.workerId,
                     farmerName = farmer,
                     quantity = quantity,
                     fat = fat,
@@ -181,7 +182,7 @@ class ToolExecutor(
             ToolIntent.GET_PENDING_PAYMENTS -> {
                 val records = repository.getPendingPaymentRecords()
                 val total = records.sumOf { it.quantity }
-                val totalAmount = records.sumOf { it.payableAmount ?: (it.quantity * 37.5) }
+                val totalAmount = records.sumOf { it.payableAmount ?: MilkRecordEntity.calculatePayableAmount(it.quantity, it.fat, it.snf) }
                 ExecutionResult(
                     summary = if (records.isNotEmpty()) {
                         "${records.size} pending payment(s) totaling ${"%.1f".format(total)} L (~₹${"%.2f".format(totalAmount)})."

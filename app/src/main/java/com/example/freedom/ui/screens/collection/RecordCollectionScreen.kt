@@ -325,11 +325,18 @@ fun RecordCollectionScreen(
 
                         Spacer(modifier = Modifier.height(10.dp))
 
+                        val isRefRequired = uiState.paymentMethod == MilkRecordEntity.METHOD_UPI || uiState.paymentMethod == MilkRecordEntity.METHOD_BANK_TRANSFER
                         OutlinedTextField(
                             value = uiState.paymentReference,
                             onValueChange = { viewModel.onPaymentReferenceChange(it) },
-                            label = { Text("Reference / Receipt ID (Optional)") },
-                            placeholder = { Text("e.g. CASH-01 or UPI Ref") },
+                            label = { Text(if (isRefRequired) "Reference / Transaction ID (Mandatory)" else "Reference / Receipt ID (Optional)") },
+                            placeholder = { Text(if (isRefRequired) "e.g. UPI-98421 or Bank Txn ID" else "e.g. CASH-01") },
+                            isError = uiState.validationResult?.paymentReferenceError != null,
+                            supportingText = {
+                                uiState.validationResult?.paymentReferenceError?.let {
+                                    Text(it, color = MaterialTheme.colorScheme.error)
+                                }
+                            },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(10.dp)

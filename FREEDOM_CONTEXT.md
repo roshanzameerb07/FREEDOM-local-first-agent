@@ -128,6 +128,13 @@ FREEDOM is an offline, privacy-first Android application designed for rural dair
 
 ## Current Development Status
 - **Build Status:** Compiles cleanly with Android Gradle Plugin 9.0.1, Kotlin 2.3.20, Compose BOM 2026.03.01.
-- **Unit Tests:** 30/30 unit tests pass green across `NumberFidelityReconcilerTest`, `LocalRagRetrieverTest`, `LocalDeterministicQueryEngineTest`, `MilkRecordValidatorTest`, `PatternBasedVoiceExtractorTest`, and `AuthRepositoryTest`.
+- **Unit Tests:** 40/40 unit tests pass green across:
+  - `LocalDeterministicQueryEngineTest` (Intent routing, safety gates, query generation)
+  - `MilkRecordValidatorTest` (Numerical bounds, UPI/Bank Transfer reference enforcement)
+  - `NumberFidelityReconcilerTest` (Exact decimal extraction, 0.0 vs missing preservation)
+  - `LocalRagRetrieverTest` (Lexical BM25 retrieval, grounded citations, unanswerable queries)
+  - `PatternBasedVoiceExtractorTest` (Field delivery pattern extraction)
+  - `AuthRepositoryTest` (Local PIN verification, worker & organization profile resolution)
 - **Physical Device Tested:** Samsung Galaxy (`RZCY90ETLVZ`) with official Gemma 3 1B IT (`gemma3-1b-it-int4.litertlm`).
 - **Airplane Mode Verified:** 100% offline execution verified with Wi-Fi and Cellular disabled.
+- **Branding & Assets:** Official FREEDOM emblem added to Login, Home TopAppBar, and adaptive launcher mipmaps across all standard density buckets.

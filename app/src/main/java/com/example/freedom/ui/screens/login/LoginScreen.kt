@@ -1,5 +1,6 @@
 package com.example.freedom.ui.screens.login
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -22,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -54,20 +56,13 @@ fun LoginScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // App Branding Icon & Title
-            Box(
+            // App Branding Official Logo & Title
+            Image(
+                painter = painterResource(id = com.example.freedom.R.drawable.freedom_logo),
+                contentDescription = "FREEDOM Logo",
                 modifier = Modifier
-                    .size(72.dp)
-                    .background(PrimaryGreen, shape = RoundedCornerShape(18.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "F",
-                    color = Color.White,
-                    fontSize = 38.sp,
-                    fontWeight = FontWeight.Black
-                )
-            }
+                    .size(88.dp)
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 

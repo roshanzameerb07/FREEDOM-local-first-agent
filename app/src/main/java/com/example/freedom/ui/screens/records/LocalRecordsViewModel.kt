@@ -80,7 +80,9 @@ class LocalRecordsViewModel(
     fun recordPayment(recordId: String, method: String, reference: String) {
         viewModelScope.launch {
             val record = repository.getRecordById(recordId)
-            val amount = record?.payableAmount ?: (record?.quantity?.let { it * 37.5 } ?: 0.0)
+            val amount = if (record != null) {
+                record.payableAmount ?: MilkRecordEntity.calculatePayableAmount(record.quantity, record.fat, record.snf)
+            } else 0.0
             repository.updatePayment(
                 id = recordId,
                 paymentStatus = MilkRecordEntity.PAYMENT_RECORDED_LOCALLY,
