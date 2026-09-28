@@ -41,10 +41,13 @@ interface MilkRecordDao {
     @Query("SELECT COUNT(*) FROM milk_records")
     suspend fun countAllRecords(): Int
 
+    @Query("SELECT * FROM milk_records WHERE id = :id LIMIT 1")
+    suspend fun getRecordById(id: String): MilkRecordEntity?
+
     @Query("SELECT * FROM milk_records WHERE uploadStatus = 'PENDING' ORDER BY createdAt ASC")
     suspend fun getPendingRecords(): List<MilkRecordEntity>
 
-    @Query("SELECT * FROM milk_records WHERE LOWER(farmerName) LIKE '%' || LOWER(:farmerName) || '%'")
+    @Query("SELECT * FROM milk_records WHERE LOWER(farmerName) LIKE '%' || LOWER(:farmerName) || '%' ORDER BY createdAt DESC")
     suspend fun getRecordsByFarmerName(farmerName: String): List<MilkRecordEntity>
 
     @Query("SELECT * FROM milk_records WHERE paymentStatus = 'PENDING' ORDER BY createdAt DESC")
@@ -74,10 +77,29 @@ interface MilkRecordDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRecords(records: List<MilkRecordEntity>)
 
+    @Query("""
+        UPDATE milk_records 
+        SET paymentStatus = :paymentStatus,
+            paymentMethod = :paymentMethod,
+            paymentReference = :paymentReference,
+            paymentTimestamp = :paymentTimestamp,
+            amountPaid = :amountPaid,
+            updatedAt = :updatedAt
+        WHERE id = :id
+    """)
+    suspend fun updatePayment(
+        id: String,
+        paymentStatus: String,
+        paymentMethod: String?,
+        paymentReference: String?,
+        paymentTimestamp: Long?,
+        amountPaid: Double?,
+        updatedAt: Long
+    )
+
     @Query("UPDATE milk_records SET uploadStatus = 'UPLOADED' WHERE id IN (:recordIds)")
     suspend fun markBatchAsUploaded(recordIds: List<String>)
 
     @Query("UPDATE milk_records SET uploadStatus = 'UPLOADED' WHERE uploadStatus = 'PENDING'")
     suspend fun markAllPendingAsUploaded(): Int
 }
-

@@ -1,5 +1,6 @@
 package com.example.freedom.ui.screens.collection
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -24,6 +25,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.freedom.data.local.entity.MilkRecordEntity
 import com.example.freedom.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -38,11 +40,10 @@ fun RecordCollectionScreen(
     val focusManager = LocalFocusManager.current
     val snackbarHostState = remember { SnackbarHostState() }
 
-    var showSuccessDialog by remember { mutableStateOf(false) }
-
     LaunchedEffect(uiState.saveSuccess) {
         if (uiState.saveSuccess) {
-            showSuccessDialog = true
+            snackbarHostState.showSnackbar("Collection saved for ${uiState.lastSavedFarmerName}!")
+            viewModel.dismissSuccess()
         }
     }
 
@@ -51,7 +52,7 @@ fun RecordCollectionScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Record Milk Collection",
+                        text = "Collect Milk",
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
@@ -60,7 +61,7 @@ fun RecordCollectionScreen(
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back to Home",
+                            contentDescription = "Back",
                             tint = Color.White
                         )
                     }
@@ -81,101 +82,7 @@ fun RecordCollectionScreen(
                 .padding(16.dp)
         ) {
 
-            // Voice Input Future-Ready Architecture Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = PrimaryContainer),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .background(PrimaryGreen, shape = CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Mic,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text(
-                                text = "Voice Entry (AI Pipeline Conduit)",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = OnPrimaryContainer
-                            )
-                            Text(
-                                text = "Speech -> On-Device SLM -> Structured Draft",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = PrimaryGreenDark
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Text(
-                        text = "Future input: \"Ramesh gave 18 litres, fat 4.2 and SNF 8.6. Payment is pending.\"",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary,
-                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                viewModel.processVoiceSample()
-                            },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryGreen)
-                        ) {
-                            Icon(Icons.Default.GraphicEq, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Speak (Simulate Voice)")
-                        }
-
-                        OutlinedButton(
-                            onClick = { viewModel.fillSampleRecord() },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = PrimaryGreen)
-                        ) {
-                            Text("Auto-Fill Demo")
-                        }
-                    }
-
-                    if (uiState.voiceExtractionMessage != null) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = uiState.voiceExtractionMessage ?: "",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = PrimaryGreenDark,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Manual Entry Form Card
+            // Form Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -185,17 +92,22 @@ fun RecordCollectionScreen(
                 Column(
                     modifier = Modifier.padding(20.dp)
                 ) {
-                    Text(
-                        text = "Milk Collection Details",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                    Text(
-                        text = "Enter validated metrics for local storage",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextTertiary
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "New Collection Entry",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+
+                        TextButton(onClick = { viewModel.fillSampleRecord() }) {
+                            Text("Fill Sample", color = PrimaryGreen)
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(16.dp))
 
@@ -203,53 +115,50 @@ fun RecordCollectionScreen(
                     OutlinedTextField(
                         value = uiState.farmerName,
                         onValueChange = { viewModel.onFarmerNameChange(it) },
-                        label = { Text("Farmer Name *") },
+                        label = { Text("Farmer Name") },
                         placeholder = { Text("e.g. Ramesh") },
-                        leadingIcon = {
-                            Icon(Icons.Default.Person, contentDescription = null, tint = PrimaryGreen)
-                        },
                         isError = uiState.validationResult?.farmerNameError != null,
                         supportingText = {
                             uiState.validationResult?.farmerNameError?.let {
-                                Text(it, color = ErrorRed)
+                                Text(it, color = MaterialTheme.colorScheme.error)
                             }
                         },
+                        leadingIcon = {
+                            Icon(Icons.Default.Person, contentDescription = null, tint = PrimaryGreen)
+                        },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Text,
                             imeAction = ImeAction.Next
                         ),
                         keyboardActions = KeyboardActions(
                             onNext = { focusManager.moveFocus(FocusDirection.Down) }
                         ),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = PrimaryGreen,
-                            unfocusedBorderColor = OutlineColor
-                        )
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     // 2. Quantity (L)
                     OutlinedTextField(
                         value = uiState.quantity,
                         onValueChange = { viewModel.onQuantityChange(it) },
-                        label = { Text("Quantity (Litres) *") },
-                        placeholder = { Text("e.g. 18.0") },
+                        label = { Text("Quantity (Litres)") },
+                        placeholder = { Text("e.g. 18.5") },
+                        isError = uiState.validationResult?.quantityError != null,
+                        supportingText = {
+                            uiState.validationResult?.quantityError?.let {
+                                Text(it, color = MaterialTheme.colorScheme.error)
+                            }
+                        },
                         leadingIcon = {
                             Icon(Icons.Default.WaterDrop, contentDescription = null, tint = PrimaryGreen)
                         },
                         trailingIcon = {
-                            Text("L", fontWeight = FontWeight.Bold, color = TextTertiary, modifier = Modifier.padding(end = 12.dp))
-                        },
-                        isError = uiState.validationResult?.quantityError != null,
-                        supportingText = {
-                            uiState.validationResult?.quantityError?.let {
-                                Text(it, color = ErrorRed)
-                            }
+                            Text("L", style = MaterialTheme.typography.labelLarge, color = TextSecondary, modifier = Modifier.padding(end = 12.dp))
                         },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Decimal,
                             imeAction = ImeAction.Next
@@ -257,15 +166,13 @@ fun RecordCollectionScreen(
                         keyboardActions = KeyboardActions(
                             onNext = { focusManager.moveFocus(FocusDirection.Down) }
                         ),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = PrimaryGreen,
-                            unfocusedBorderColor = OutlineColor
-                        )
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
-                    // 3. Fat (%) and 4. SNF (%) in Row
+                    // 3. Fat & SNF Row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -273,42 +180,44 @@ fun RecordCollectionScreen(
                         OutlinedTextField(
                             value = uiState.fat,
                             onValueChange = { viewModel.onFatChange(it) },
-                            label = { Text("Fat (%) *") },
-                            placeholder = { Text("4.2") },
+                            label = { Text("Fat %") },
+                            placeholder = { Text("e.g. 4.2") },
                             isError = uiState.validationResult?.fatError != null,
                             supportingText = {
                                 uiState.validationResult?.fatError?.let {
-                                    Text(it, color = ErrorRed, style = MaterialTheme.typography.bodySmall)
+                                    Text(it, color = MaterialTheme.colorScheme.error)
                                 }
                             },
+                            trailingIcon = {
+                                Text("%", style = MaterialTheme.typography.labelMedium, color = TextSecondary, modifier = Modifier.padding(end = 8.dp))
+                            },
                             singleLine = true,
-                            modifier = Modifier.weight(1f),
                             keyboardOptions = KeyboardOptions(
                                 keyboardType = KeyboardType.Decimal,
                                 imeAction = ImeAction.Next
                             ),
                             keyboardActions = KeyboardActions(
-                                onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                                onNext = { focusManager.moveFocus(FocusDirection.Right) }
                             ),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = PrimaryGreen,
-                                unfocusedBorderColor = OutlineColor
-                            )
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp)
                         )
 
                         OutlinedTextField(
                             value = uiState.snf,
                             onValueChange = { viewModel.onSnfChange(it) },
-                            label = { Text("SNF (%) *") },
-                            placeholder = { Text("8.6") },
+                            label = { Text("SNF %") },
+                            placeholder = { Text("e.g. 8.6") },
                             isError = uiState.validationResult?.snfError != null,
                             supportingText = {
                                 uiState.validationResult?.snfError?.let {
-                                    Text(it, color = ErrorRed, style = MaterialTheme.typography.bodySmall)
+                                    Text(it, color = MaterialTheme.colorScheme.error)
                                 }
                             },
+                            trailingIcon = {
+                                Text("%", style = MaterialTheme.typography.labelMedium, color = TextSecondary, modifier = Modifier.padding(end = 8.dp))
+                            },
                             singleLine = true,
-                            modifier = Modifier.weight(1f),
                             keyboardOptions = KeyboardOptions(
                                 keyboardType = KeyboardType.Decimal,
                                 imeAction = ImeAction.Done
@@ -316,78 +225,139 @@ fun RecordCollectionScreen(
                             keyboardActions = KeyboardActions(
                                 onDone = { focusManager.clearFocus() }
                             ),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = PrimaryGreen,
-                                unfocusedBorderColor = OutlineColor
-                            )
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp)
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    // 4. Estimated Payout Display
+                    if (uiState.estimatedAmount > 0.0) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            color = PrimaryContainer.copy(alpha = 0.6f),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Estimated Amount:",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = OnPrimaryContainer
+                                )
+                                Text(
+                                    text = "₹${"%.2f".format(uiState.estimatedAmount)}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = PrimaryGreenDark
+                                )
+                            }
+                        }
+                    }
 
-                    // 5. Payment Status
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = Gray100)
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // 5. Payment Section
                     Text(
-                        text = "Payment Status *",
-                        style = MaterialTheme.typography.labelLarge,
+                        text = "Payment Information",
+                        style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
                     )
-
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        PaymentOptionChip(
-                            label = "Pending",
-                            isSelected = uiState.paymentStatus == "PENDING",
-                            selectedColor = PendingAmber,
-                            selectedBg = PendingAmberBg,
-                            onClick = { viewModel.onPaymentStatusChange("PENDING") },
-                            modifier = Modifier.weight(1f)
+                        FilterChip(
+                            selected = !uiState.isPaymentRecorded,
+                            onClick = { viewModel.onPaymentRecordedToggle(false) },
+                            label = { Text("Payment Pending") },
+                            leadingIcon = if (!uiState.isPaymentRecorded) {
+                                { Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                            } else null
                         )
 
-                        PaymentOptionChip(
-                            label = "Paid",
-                            isSelected = uiState.paymentStatus == "PAID",
-                            selectedColor = PaidGreen,
-                            selectedBg = PaidGreenBg,
-                            onClick = { viewModel.onPaymentStatusChange("PAID") },
-                            modifier = Modifier.weight(1f)
+                        FilterChip(
+                            selected = uiState.isPaymentRecorded,
+                            onClick = { viewModel.onPaymentRecordedToggle(true) },
+                            label = { Text("Record Payment") },
+                            leadingIcon = if (uiState.isPaymentRecorded) {
+                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                            } else null
                         )
                     }
 
-                    if (uiState.validationResult?.paymentStatusError != null) {
-                        Spacer(modifier = Modifier.height(4.dp))
+                    // If Payment is Recorded
+                    if (uiState.isPaymentRecorded) {
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Text("Payment Method:", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            PaymentMethodChip(
+                                title = "Cash",
+                                isSelected = uiState.paymentMethod == MilkRecordEntity.METHOD_CASH,
+                                onClick = { viewModel.onPaymentMethodChange(MilkRecordEntity.METHOD_CASH) }
+                            )
+                            PaymentMethodChip(
+                                title = "UPI",
+                                isSelected = uiState.paymentMethod == MilkRecordEntity.METHOD_UPI,
+                                onClick = { viewModel.onPaymentMethodChange(MilkRecordEntity.METHOD_UPI) }
+                            )
+                            PaymentMethodChip(
+                                title = "Bank",
+                                isSelected = uiState.paymentMethod == MilkRecordEntity.METHOD_BANK_TRANSFER,
+                                onClick = { viewModel.onPaymentMethodChange(MilkRecordEntity.METHOD_BANK_TRANSFER) }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        OutlinedTextField(
+                            value = uiState.paymentReference,
+                            onValueChange = { viewModel.onPaymentReferenceChange(it) },
+                            label = { Text("Reference / Receipt ID (Optional)") },
+                            placeholder = { Text("e.g. CASH-01 or UPI Ref") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+
+                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = uiState.validationResult?.paymentStatusError ?: "",
-                            color = ErrorRed,
-                            style = MaterialTheme.typography.bodySmall
+                            text = "Note: Recorded locally on device. Awaiting bank / cooperative reconciliation.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextSecondary
                         )
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Save Button
+                    // Review & Save Button
                     Button(
-                        onClick = {
-                            focusManager.clearFocus()
-                            viewModel.saveRecord(onSuccess = {})
-                        },
+                        onClick = { viewModel.onReviewClick() },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(52.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = PrimaryGreen)
                     ) {
-                        Icon(Icons.Default.Save, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Save Record (Store Locally)",
+                            text = "Review Collection",
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
@@ -395,47 +365,50 @@ fun RecordCollectionScreen(
         }
     }
 
-    // Success Confirmation Dialog
-    if (showSuccessDialog) {
+    // Review Dialog
+    if (uiState.isReviewing) {
         AlertDialog(
-            onDismissRequest = {
-                showSuccessDialog = false
-                viewModel.dismissSuccess()
-            },
-            icon = {
-                Icon(
-                    imageVector = Icons.Default.CheckCircle,
-                    contentDescription = null,
-                    tint = PaidGreen,
-                    modifier = Modifier.size(48.dp)
+            onDismissRequest = { viewModel.onDismissReview() },
+            title = {
+                Text(
+                    text = "Confirm Collection",
+                    fontWeight = FontWeight.Bold
                 )
             },
-            title = {
-                Text("Record Saved Offline", fontWeight = FontWeight.Bold)
-            },
             text = {
-                Text("Collection record for '${uiState.lastSavedFarmerName}' has been successfully validated and committed to local SQLite storage.")
+                Column {
+                    Text("Please confirm the collection values:")
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    DetailRow("Farmer", uiState.farmerName)
+                    DetailRow("Quantity", "${uiState.quantity} L")
+                    DetailRow("Fat", "${uiState.fat}%")
+                    DetailRow("SNF", "${uiState.snf}%")
+                    DetailRow("Est. Amount", "₹${"%.2f".format(uiState.estimatedAmount)}")
+                    DetailRow(
+                        "Payment",
+                        if (uiState.isPaymentRecorded) "Recorded locally (${uiState.paymentMethod})" else "Pending"
+                    )
+                    if (uiState.isPaymentRecorded && uiState.paymentReference.isNotBlank()) {
+                        DetailRow("Ref ID", uiState.paymentReference)
+                    }
+                }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        showSuccessDialog = false
-                        viewModel.dismissSuccess()
-                        onNavigateToRecords()
+                        viewModel.confirmAndSave {
+                            onNavigateToRecords()
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = PrimaryGreen)
                 ) {
-                    Text("View in Local Records")
+                    Text("Save Collection")
                 }
             },
             dismissButton = {
-                TextButton(
-                    onClick = {
-                        showSuccessDialog = false
-                        viewModel.dismissSuccess()
-                    }
-                ) {
-                    Text("Add Another Record")
+                OutlinedButton(onClick = { viewModel.onDismissReview() }) {
+                    Text("Edit")
                 }
             }
         )
@@ -443,42 +416,36 @@ fun RecordCollectionScreen(
 }
 
 @Composable
-fun PaymentOptionChip(
-    label: String,
+fun PaymentMethodChip(
+    title: String,
     isSelected: Boolean,
-    selectedColor: Color,
-    selectedBg: Color,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    onClick: () -> Unit
 ) {
     Surface(
-        modifier = modifier
-            .height(48.dp)
-            .clickable { onClick() },
-        shape = RoundedCornerShape(10.dp),
-        color = if (isSelected) selectedBg else SurfaceLight,
-        border = androidx.compose.foundation.BorderStroke(
-            width = if (isSelected) 2.dp else 1.dp,
-            color = if (isSelected) selectedColor else OutlineColor
-        )
+        onClick = onClick,
+        shape = RoundedCornerShape(8.dp),
+        color = if (isSelected) PrimaryGreen else Gray100.copy(alpha = 0.5f),
+        border = BorderStroke(1.dp, if (isSelected) PrimaryGreen else Gray100)
     ) {
-        Row(
-            modifier = Modifier.fillMaxSize(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            RadioButton(
-                selected = isSelected,
-                onClick = null,
-                colors = RadioButtonDefaults.colors(selectedColor = selectedColor)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = label,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                color = if (isSelected) selectedColor else TextPrimary,
-                style = MaterialTheme.typography.bodyMedium
-            )
-        }
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+            color = if (isSelected) Color.White else TextPrimary,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+        )
+    }
+}
+
+@Composable
+fun DetailRow(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = TextPrimary)
     }
 }

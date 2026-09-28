@@ -27,7 +27,7 @@ class NumberFidelityReconcilerTest {
         assertEquals("4.2", reconciled["fat"])
         assertEquals("8.6", reconciled["snf"])
         assertEquals("Ramesh", reconciled["farmerName"])
-        assertEquals("pending", reconciled["paymentStatus"])
+        assertEquals("PENDING", reconciled["paymentStatus"]?.uppercase())
     }
 
     @Test

@@ -7,14 +7,16 @@ import com.example.freedom.data.local.entity.MilkRecordEntity
 import com.example.freedom.data.repository.MilkRecordRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
 
 data class LocalRecordsUiState(
     val searchQuery: String = "",
-    val paymentFilter: String? = null, // null = All, "PENDING", "PAID"
-    val uploadFilter: String? = null,   // null = All, "PENDING", "UPLOADED"
+    val paymentFilter: String? = null, // null = All, "PENDING", "RECORDED_LOCALLY"
+    val uploadFilter: String? = null,
     val records: List<MilkRecordEntity> = emptyList(),
     val totalCount: Int = 0,
-    val totalQuantityLitres: Double = 0.0
+    val totalQuantityLitres: Double = 0.0,
+    val selectedRecordForPayment: MilkRecordEntity? = null
 )
 
 class LocalRecordsViewModel(
@@ -24,33 +26,43 @@ class LocalRecordsViewModel(
     private val _searchQuery = MutableStateFlow("")
     private val _paymentFilter = MutableStateFlow<String?>(null)
     private val _uploadFilter = MutableStateFlow<String?>(null)
+    private val _selectedRecord = MutableStateFlow<MilkRecordEntity?>(null)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<LocalRecordsUiState> = combine(
         _searchQuery,
         _paymentFilter,
-        _uploadFilter
-    ) { query, payment, upload ->
-        Triple(query, payment, upload)
-    }.flatMapLatest { (query, payment, upload) ->
+        _uploadFilter,
+        _selectedRecord
+    ) { query, payment, upload, selected ->
+        RecordFilters(query, payment, upload, selected)
+    }.flatMapLatest { filters ->
         repository.searchAndFilterRecords(
-            query = query,
-            paymentStatus = payment,
-            uploadStatus = upload
+            query = filters.query,
+            paymentStatus = filters.payment,
+            uploadStatus = filters.upload
         ).map { recordList ->
             LocalRecordsUiState(
-                searchQuery = query,
-                paymentFilter = payment,
-                uploadFilter = upload,
+                searchQuery = filters.query,
+                paymentFilter = filters.payment,
+                uploadFilter = filters.upload,
                 records = recordList,
                 totalCount = recordList.size,
-                totalQuantityLitres = recordList.sumOf { it.quantity }
+                totalQuantityLitres = recordList.sumOf { it.quantity },
+                selectedRecordForPayment = filters.selected
             )
         }
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = LocalRecordsUiState()
+    )
+
+    private data class RecordFilters(
+        val query: String,
+        val payment: String?,
+        val upload: String?,
+        val selected: MilkRecordEntity?
     )
 
     fun onSearchQueryChange(query: String) {
@@ -61,8 +73,23 @@ class LocalRecordsViewModel(
         _paymentFilter.value = if (_paymentFilter.value == status) null else status
     }
 
-    fun onUploadFilterChange(status: String?) {
-        _uploadFilter.value = if (_uploadFilter.value == status) null else status
+    fun selectRecordForPayment(record: MilkRecordEntity?) {
+        _selectedRecord.value = record
+    }
+
+    fun recordPayment(recordId: String, method: String, reference: String) {
+        viewModelScope.launch {
+            val record = repository.getRecordById(recordId)
+            val amount = record?.payableAmount ?: (record?.quantity?.let { it * 37.5 } ?: 0.0)
+            repository.updatePayment(
+                id = recordId,
+                paymentStatus = MilkRecordEntity.PAYMENT_RECORDED_LOCALLY,
+                paymentMethod = method,
+                paymentReference = reference.takeIf { it.isNotBlank() },
+                amountPaid = amount
+            )
+            _selectedRecord.value = null
+        }
     }
 
     fun clearFilters() {

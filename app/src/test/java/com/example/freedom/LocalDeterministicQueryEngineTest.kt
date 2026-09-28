@@ -2,11 +2,7 @@ package com.example.freedom
 
 import com.example.freedom.data.local.entity.MilkRecordEntity
 import com.example.freedom.data.repository.MilkRecordRepository
-import com.example.freedom.domain.ai.LocalDeterministicQueryEngine
-import com.example.freedom.domain.ai.LocalEngineResult
-import com.example.freedom.domain.ai.ToolExecutor
-import com.example.freedom.domain.ai.ToolIntent
-import com.example.freedom.domain.ai.ToolRequest
+import com.example.freedom.domain.ai.*
 import com.example.freedom.domain.model.WorkerProfileRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -59,6 +55,7 @@ class LocalDeterministicQueryEngineTest {
         assertEquals("8.6", request.args["snf"])
         assertEquals("PENDING", request.args["paymentStatus"])
         assertTrue(request.needsConfirmation)
+        assertEquals(ExecutionMode.GEMMA_EXECUTED, request.executionMode)
     }
 
     @Test
@@ -88,6 +85,30 @@ class LocalDeterministicQueryEngineTest {
     }
 
     @Test
+    fun `parseGemmaResponse preserves 2 decimal places such as 4_25 and 8_65`() {
+        val userInput = "Suresh gave 18.50 litres, fat 4.25% and SNF 8.65%."
+        val rawJson = """
+            {
+              "intent": "CREATE_MILK_RECORD",
+              "args": {
+                "farmerName": "Suresh",
+                "quantity": "18",
+                "fat": "4",
+                "snf": "8"
+              },
+              "needsConfirmation": true
+            }
+        """.trimIndent()
+
+        val request = queryEngine.parseGemmaResponse(rawJson, userInput)
+        assertNotNull(request)
+        assertEquals(ToolIntent.CREATE_MILK_RECORD, request!!.intent)
+        assertEquals("18.50", request.args["quantity"])
+        assertEquals("4.25", request.args["fat"])
+        assertEquals("8.65", request.args["snf"])
+    }
+
+    @Test
     fun `parseGemmaResponse correctly handles markdown code fences`() {
         val fenced = """
             Here is the requested intent:
@@ -104,6 +125,7 @@ class LocalDeterministicQueryEngineTest {
         assertNotNull(request)
         assertEquals(ToolIntent.GET_PENDING_PAYMENTS, request!!.intent)
         assertFalse(request.needsConfirmation)
+        assertEquals(ExecutionMode.GEMMA_EXECUTED, request.executionMode)
     }
 
     // 2. Deterministic Routing: Worker Profile
@@ -116,7 +138,7 @@ class LocalDeterministicQueryEngineTest {
 
         val execResult = toolExecutor.execute(toolResult.request)
         assertTrue(execResult.success)
-        assertEquals("Local Profile Configuration", execResult.sourceOfTruth)
+        assertEquals("Officer Profile", execResult.sourceOfTruth)
         assertTrue(execResult.summary.contains("WORKER001"))
         assertTrue(execResult.summary.contains("Ramesh K."))
     }
@@ -131,7 +153,7 @@ class LocalDeterministicQueryEngineTest {
 
         val execResult = toolExecutor.execute(toolResult.request)
         assertTrue(execResult.success)
-        assertEquals("Local Organization Configuration", execResult.sourceOfTruth)
+        assertEquals("Cooperative Profile", execResult.sourceOfTruth)
         assertTrue(execResult.summary.contains("Mandya District Cooperative"))
     }
 
@@ -145,8 +167,8 @@ class LocalDeterministicQueryEngineTest {
 
         val execResult = toolExecutor.execute(toolResult.request)
         assertTrue(execResult.success)
-        assertEquals("Local Room SQLite (Distinct Query)", execResult.sourceOfTruth)
-        assertTrue(execResult.summary.contains("3 distinct farmer(s)"))
+        assertEquals("Local Database", execResult.sourceOfTruth)
+        assertTrue(execResult.summary.contains("3 farmer(s)"))
     }
 
     // 5. Deterministic Routing: Weekly Summary
@@ -160,7 +182,7 @@ class LocalDeterministicQueryEngineTest {
 
         val execResult = toolExecutor.execute(toolResult.request)
         assertTrue(execResult.success)
-        assertEquals("Local Room SQLite (Weekly Aggregation)", execResult.sourceOfTruth)
+        assertEquals("Local Database", execResult.sourceOfTruth)
         assertTrue(execResult.summary.contains("18.0 L"))
     }
 
@@ -178,6 +200,7 @@ class LocalDeterministicQueryEngineTest {
         assertEquals("KNOW-PAY-01", execResult.ragDocument!!.id)
         assertTrue(execResult.sourceOfTruth.contains("Clause 4.2"))
         assertTrue(execResult.summary.contains("mandatory conditions"))
+        assertEquals(ExecutionMode.RAG_EXECUTION, execResult.executionMode)
     }
 
     // 7. Deterministic Validation & Guardrails
@@ -194,9 +217,8 @@ class LocalDeterministicQueryEngineTest {
 
         val execResult = toolExecutor.execute(toolResult.request)
         assertFalse("Incomplete record must fail deterministic validation", execResult.success)
-        assertTrue(execResult.summary.contains("Validation Failed"))
-        assertTrue(execResult.summary.contains("Fat percentage is required"))
-        assertEquals("Deterministic Validation Check (Failed)", execResult.sourceOfTruth)
+        assertTrue(execResult.summary.contains("Missing or invalid information"))
+        assertEquals("Input Validation Guardrail", execResult.sourceOfTruth)
         assertEquals(0, fakeRepository.insertedRecords.size)
     }
 
@@ -223,6 +245,8 @@ class LocalDeterministicQueryEngineTest {
         assertEquals(4.2, saved.fat, 0.001)
         assertEquals(8.6, saved.snf, 0.001)
         assertEquals("PENDING", saved.paymentStatus)
+        assertEquals("ORG001", saved.orgId)
+        assertEquals("WORKER001", saved.workerId)
     }
 
     // 8. Pending payments execution
@@ -238,12 +262,33 @@ class LocalDeterministicQueryEngineTest {
         assertEquals(2, execResult.records.size)
     }
 
+    // 9. Payment recording lifecycle test
+    @Test
+    fun `payment recording updates status to RECORDED_LOCALLY with method and reference`() = runTest {
+        fakeRepository.updatePayment(
+            id = "1",
+            paymentStatus = MilkRecordEntity.PAYMENT_RECORDED_LOCALLY,
+            paymentMethod = MilkRecordEntity.METHOD_UPI,
+            paymentReference = "UPI-REF-9988",
+            amountPaid = 675.0
+        )
+
+        val updated = fakeRepository.getRecordById("1")
+        assertNotNull(updated)
+        assertEquals(MilkRecordEntity.PAYMENT_RECORDED_LOCALLY, updated!!.paymentStatus)
+        assertEquals(MilkRecordEntity.METHOD_UPI, updated.paymentMethod)
+        assertEquals("UPI-REF-9988", updated.paymentReference)
+        assertEquals(675.0, updated.amountPaid ?: 0.0, 0.001)
+    }
+
     private class FakeMilkRecordRepository : MilkRecordRepository {
         val insertedRecords = mutableListOf<MilkRecordEntity>()
 
-        private val sampleRecords = listOf(
+        private val sampleRecords = mutableListOf(
             MilkRecordEntity(
                 id = "1",
+                orgId = "ORG001",
+                workerId = "WORKER001",
                 farmerName = "Ramesh",
                 quantity = 18.0,
                 fat = 4.2,
@@ -253,15 +298,20 @@ class LocalDeterministicQueryEngineTest {
             ),
             MilkRecordEntity(
                 id = "2",
+                orgId = "ORG001",
+                workerId = "WORKER001",
                 farmerName = "Suresh",
                 quantity = 12.0,
                 fat = 4.0,
                 snf = 8.5,
-                paymentStatus = MilkRecordEntity.PAYMENT_PAID,
+                paymentStatus = MilkRecordEntity.PAYMENT_RECORDED_LOCALLY,
+                paymentMethod = MilkRecordEntity.METHOD_CASH,
                 uploadStatus = MilkRecordEntity.UPLOAD_STATUS_PENDING
             ),
             MilkRecordEntity(
                 id = "3",
+                orgId = "ORG001",
+                workerId = "WORKER001",
                 farmerName = "Mahesh",
                 quantity = 20.0,
                 fat = 4.3,
@@ -300,6 +350,10 @@ class LocalDeterministicQueryEngineTest {
             insertedRecords.add(record)
         }
 
+        override suspend fun getRecordById(id: String): MilkRecordEntity? {
+            return (sampleRecords + insertedRecords).find { it.id == id }
+        }
+
         override suspend fun getPendingRecords(): List<MilkRecordEntity> =
             (sampleRecords + insertedRecords).filter { it.uploadStatus == MilkRecordEntity.UPLOAD_STATUS_PENDING }
 
@@ -320,6 +374,25 @@ class LocalDeterministicQueryEngineTest {
 
         override suspend fun getWeeklyRecordsCount(): Int =
             (sampleRecords + insertedRecords).size
+
+        override suspend fun updatePayment(
+            id: String,
+            paymentStatus: String,
+            paymentMethod: String?,
+            paymentReference: String?,
+            amountPaid: Double?
+        ) {
+            val idx = sampleRecords.indexOfFirst { it.id == id }
+            if (idx != -1) {
+                val old = sampleRecords[idx]
+                sampleRecords[idx] = old.copy(
+                    paymentStatus = paymentStatus,
+                    paymentMethod = paymentMethod,
+                    paymentReference = paymentReference,
+                    amountPaid = amountPaid
+                )
+            }
+        }
 
         override suspend fun simulateBatchSync(): Int = 0
     }

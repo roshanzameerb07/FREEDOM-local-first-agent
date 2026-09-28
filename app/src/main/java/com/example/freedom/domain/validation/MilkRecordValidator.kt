@@ -74,7 +74,7 @@ class MilkRecordValidator {
         }
 
         // 5. Payment Status validation
-        val validStatuses = listOf("PENDING", "PAID")
+        val validStatuses = listOf("PENDING", "PAID", "RECORDED_LOCALLY", "COMPLETE")
         if (paymentStatus.trim().uppercase() !in validStatuses) {
             paymentStatusError = "Please select a payment status (Pending or Paid)"
         }

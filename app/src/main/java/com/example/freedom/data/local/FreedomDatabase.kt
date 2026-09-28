@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 
 @Database(
     entities = [MilkRecordEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class FreedomDatabase : RoomDatabase() {
@@ -31,6 +31,7 @@ abstract class FreedomDatabase : RoomDatabase() {
                     FreedomDatabase::class.java,
                     "freedom_local.db"
                 )
+                    .fallbackToDestructiveMigration()
                     .addCallback(DatabaseCreationCallback())
                     .build()
                 INSTANCE = instance
@@ -39,43 +40,54 @@ abstract class FreedomDatabase : RoomDatabase() {
         }
 
         private class DatabaseCreationCallback : RoomDatabase.Callback() {
-            /**
-             * Called ONLY ONCE when the database file is first created on device storage.
-             * It does NOT run on subsequent app launches or database opens.
-             */
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
-                // Seed initial benchmark records once upon initial database creation
                 CoroutineScope(Dispatchers.IO).launch {
                     INSTANCE?.let { database ->
                         val dao = database.milkRecordDao()
                         val currentTime = System.currentTimeMillis()
                         val initialSeedRecords = listOf(
                             MilkRecordEntity(
+                                orgId = "ORG001",
+                                workerId = "WORKER001",
                                 farmerName = "Ramesh",
                                 quantity = 18.0,
                                 fat = 4.2,
                                 snf = 8.6,
                                 paymentStatus = MilkRecordEntity.PAYMENT_PENDING,
-                                createdAt = currentTime - (1000 * 60 * 60 * 3), // 3 hours ago today
+                                payableAmount = MilkRecordEntity.calculatePayableAmount(18.0, 4.2, 8.6),
+                                createdAt = currentTime - (1000 * 60 * 60 * 3),
+                                updatedAt = currentTime - (1000 * 60 * 60 * 3),
                                 uploadStatus = MilkRecordEntity.UPLOAD_STATUS_PENDING
                             ),
                             MilkRecordEntity(
+                                orgId = "ORG001",
+                                workerId = "WORKER001",
                                 farmerName = "Suresh",
                                 quantity = 12.0,
                                 fat = 4.0,
                                 snf = 8.5,
-                                paymentStatus = MilkRecordEntity.PAYMENT_PAID,
-                                createdAt = currentTime - (1000 * 60 * 60 * 2), // 2 hours ago today
+                                paymentStatus = MilkRecordEntity.PAYMENT_RECORDED_LOCALLY,
+                                paymentMethod = MilkRecordEntity.METHOD_CASH,
+                                paymentReference = "CASH-REC-001",
+                                paymentTimestamp = currentTime - (1000 * 60 * 60 * 2),
+                                payableAmount = MilkRecordEntity.calculatePayableAmount(12.0, 4.0, 8.5),
+                                amountPaid = MilkRecordEntity.calculatePayableAmount(12.0, 4.0, 8.5),
+                                createdAt = currentTime - (1000 * 60 * 60 * 2),
+                                updatedAt = currentTime - (1000 * 60 * 60 * 2),
                                 uploadStatus = MilkRecordEntity.UPLOAD_STATUS_PENDING
                             ),
                             MilkRecordEntity(
+                                orgId = "ORG001",
+                                workerId = "WORKER001",
                                 farmerName = "Mahesh",
                                 quantity = 20.0,
                                 fat = 4.3,
                                 snf = 8.7,
                                 paymentStatus = MilkRecordEntity.PAYMENT_PENDING,
-                                createdAt = currentTime - (1000 * 60 * 60 * 1), // 1 hour ago today
+                                payableAmount = MilkRecordEntity.calculatePayableAmount(20.0, 4.3, 8.7),
+                                createdAt = currentTime - (1000 * 60 * 60 * 1),
+                                updatedAt = currentTime - (1000 * 60 * 60 * 1),
                                 uploadStatus = MilkRecordEntity.UPLOAD_STATUS_PENDING
                             )
                         )

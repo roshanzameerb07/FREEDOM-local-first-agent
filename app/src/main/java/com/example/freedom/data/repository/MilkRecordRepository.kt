@@ -15,6 +15,7 @@ interface MilkRecordRepository {
     fun getPendingUploadCount(): Flow<Int>
     fun getAllRecordsCount(): Flow<Int>
     suspend fun insertRecord(record: MilkRecordEntity)
+    suspend fun getRecordById(id: String): MilkRecordEntity?
     suspend fun getPendingRecords(): List<MilkRecordEntity>
     suspend fun getRecordsByFarmerName(farmerName: String): List<MilkRecordEntity>
     suspend fun getPendingPaymentRecords(): List<MilkRecordEntity>
@@ -22,6 +23,12 @@ interface MilkRecordRepository {
     suspend fun getDistinctFarmersCount(period: String = "today"): Int
     suspend fun getWeeklyTotalQuantity(): Double
     suspend fun getWeeklyRecordsCount(): Int
+    suspend fun updatePayment(
+        id: String,
+        paymentStatus: String,
+        paymentMethod: String?,
+        paymentReference: String?,
+        amountPaid: Double?
+    )
     suspend fun simulateBatchSync(): Int
 }
-

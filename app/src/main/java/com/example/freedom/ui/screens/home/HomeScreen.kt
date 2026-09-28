@@ -12,9 +12,7 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -22,6 +20,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.freedom.domain.model.WorkerProfileRepository
 import com.example.freedom.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -36,6 +35,7 @@ fun HomeScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var showProfileDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -50,13 +50,20 @@ fun HomeScreen(
                             letterSpacing = 1.sp
                         )
                         Text(
-                            text = "Local-First AI Agent",
+                            text = "Dairy Field Operations",
                             style = MaterialTheme.typography.bodySmall,
                             color = Color.White.copy(alpha = 0.85f)
                         )
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showProfileDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Default.AccountCircle,
+                            contentDescription = "My Profile",
+                            tint = Color.White
+                        )
+                    }
                     IconButton(onClick = {
                         viewModel.logout()
                         onLogout()
@@ -82,7 +89,7 @@ fun HomeScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
-            // OFFLINE Status Banner
+            // Offline Status Notice
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = OfflineGreenBg,
@@ -101,13 +108,13 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
-                            text = "STATUS: OFFLINE • Working locally",
+                            text = "Ready • Working Offline",
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Bold,
                             color = OfflineGreen
                         )
                         Text(
-                            text = "All data stored on device SQLite. Internet not required.",
+                            text = "All collection and payment records are saved on device.",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextSecondary
                         )
@@ -117,66 +124,62 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // User Profile Welcome
+            // Officer Welcome Header
             uiState.currentUser?.let { user ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Officer: ${user.workerName}",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                    Surface(
-                        color = PrimaryContainer,
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
+                    Column {
                         Text(
-                            text = user.organizationId,
-                            style = MaterialTheme.typography.labelMedium,
+                            text = "Welcome, ${user.workerName}",
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = OnPrimaryContainer,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            color = TextPrimary
+                        )
+                        Text(
+                            text = "ID: ${user.workerId}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
                         )
                     }
+
+                    TextButton(onClick = { showProfileDialog = true }) {
+                        Text("My Profile", color = PrimaryGreen, fontWeight = FontWeight.Bold)
+                    }
                 }
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
             }
 
-            // Metrics Cards Row
+            // Summary Metrics Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Today's Collection Card
                 MetricCard(
-                    title = "Today's Collection",
+                    title = "Today's Volume",
                     value = "${String.format("%.1f", uiState.todayLitres)} L",
-                    subtitle = "Volume collected",
+                    subtitle = "Collected",
                     icon = Icons.Default.WaterDrop,
                     iconTint = PrimaryGreen,
                     modifier = Modifier.weight(1f)
                 )
 
-                // Records Today Card
                 MetricCard(
-                    title = "Records Today",
+                    title = "Entries Today",
                     value = "${uiState.recordsTodayCount}",
-                    subtitle = "Entries logged",
+                    subtitle = "Collections",
                     icon = Icons.AutoMirrored.Filled.ReceiptLong,
                     iconTint = InfoBlue,
                     modifier = Modifier.weight(1f)
                 )
 
-                // Pending Upload Card
                 MetricCard(
-                    title = "Pending Upload",
+                    title = "To Send",
                     value = "${uiState.pendingUploadCount}",
-                    subtitle = "records",
-                    icon = Icons.Default.CloudQueue,
+                    subtitle = "Pending sync",
+                    icon = Icons.Default.CloudUpload,
                     iconTint = PendingAmber,
                     modifier = Modifier.weight(1f)
                 )
@@ -185,7 +188,7 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = "Field Actions",
+                text = "Field Tasks",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = TextPrimary
@@ -193,52 +196,89 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Action 1: Record Collection
-            ActionNavigationCard(
-                title = "Record Collection",
-                subtitle = "Log farmer milk volume, fat %, SNF & payment",
+            // Action 1: Collect Milk
+            FieldActionCard(
+                title = "Collect Milk",
+                subtitle = "Record farmer deliveries, fat %, SNF and payment",
                 icon = Icons.Default.AddCircle,
-                badgeText = "Primary",
+                badgeText = "Fast Entry",
                 containerColor = PrimaryContainer,
                 onClick = onNavigateToRecordCollection
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Action 2: View Records
-            ActionNavigationCard(
-                title = "View Records",
-                subtitle = "Browse, search by farmer, and filter local entries",
+            // Action 2: Records & Payments
+            FieldActionCard(
+                title = "Records & Payments",
+                subtitle = "Browse deliveries, review pending payments and mark paid",
                 icon = Icons.Default.FolderOpen,
-                badgeText = "${uiState.totalRecordsCount} Local",
+                badgeText = "${uiState.totalRecordsCount} Records",
                 containerColor = CardBackground,
                 onClick = onNavigateToLocalRecords
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Action 3: Ask FREEDOM
-            ActionNavigationCard(
+            // Action 3: Ask Assistant
+            FieldActionCard(
                 title = "Ask FREEDOM",
-                subtitle = "Query local data with natural language & SLM conduit",
-                icon = Icons.Default.Psychology,
-                badgeText = "AI Conduit",
+                subtitle = "Ask questions about deliveries, payments, or cooperative policies",
+                icon = Icons.Default.ChatBubble,
+                badgeText = "Assistant",
                 containerColor = CardBackground,
                 onClick = onNavigateToAskFreedom
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Action 4: Sync
-            ActionNavigationCard(
-                title = "Sync",
-                subtitle = "Controlled batch sync pipeline simulation (Demo)",
+            // Action 4: Send Data (Sync)
+            FieldActionCard(
+                title = "Send Data",
+                subtitle = "Upload pending collections when connected at the center",
                 icon = Icons.Default.Sync,
-                badgeText = "Simulation",
+                badgeText = "${uiState.pendingUploadCount} Pending",
                 containerColor = CardBackground,
                 onClick = onNavigateToSync
             )
         }
+    }
+
+    // Profile Dialog
+    if (showProfileDialog) {
+        val profile = WorkerProfileRepository.getProfile()
+        val org = WorkerProfileRepository.getOrganizationInfo()
+
+        AlertDialog(
+            onDismissRequest = { showProfileDialog = false },
+            title = {
+                Text("Officer & Cooperative Profile", fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Column {
+                    DetailRow("Officer ID", profile.workerId)
+                    DetailRow("Officer Name", profile.workerName)
+                    DetailRow("Role", profile.role)
+                    DetailRow("Assigned Area", profile.assignedArea)
+                    DetailRow("Center", profile.centerName)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    HorizontalDivider(color = Gray100)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    DetailRow("Cooperative", org.organizationName)
+                    DetailRow("Org ID", org.organizationId)
+                    DetailRow("District", org.regionalDistrict)
+                    DetailRow("Registration", org.registrationNumber)
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showProfileDialog = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryGreen)
+                ) {
+                    Text("Close")
+                }
+            }
+        )
     }
 }
 
@@ -286,7 +326,7 @@ fun MetricCard(
 }
 
 @Composable
-fun ActionNavigationCard(
+fun FieldActionCard(
     title: String,
     subtitle: String,
     icon: ImageVector,
@@ -362,5 +402,18 @@ fun ActionNavigationCard(
                 tint = TextTertiary
             )
         }
+    }
+}
+
+@Composable
+fun DetailRow(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = TextPrimary)
     }
 }

@@ -35,6 +35,10 @@ class MilkRecordRepositoryImpl(
         dao.insertRecord(record)
     }
 
+    override suspend fun getRecordById(id: String): MilkRecordEntity? {
+        return dao.getRecordById(id)
+    }
+
     override suspend fun getPendingRecords(): List<MilkRecordEntity> = dao.getPendingRecords()
 
     override suspend fun getRecordsByFarmerName(farmerName: String): List<MilkRecordEntity> {
@@ -78,6 +82,25 @@ class MilkRecordRepositoryImpl(
     override suspend fun getWeeklyRecordsCount(): Int {
         val startOfWeek = getStartOfWeekTimestamp()
         return dao.getRecordsCountSince(startOfWeek)
+    }
+
+    override suspend fun updatePayment(
+        id: String,
+        paymentStatus: String,
+        paymentMethod: String?,
+        paymentReference: String?,
+        amountPaid: Double?
+    ) {
+        val now = System.currentTimeMillis()
+        dao.updatePayment(
+            id = id,
+            paymentStatus = paymentStatus,
+            paymentMethod = paymentMethod,
+            paymentReference = paymentReference,
+            paymentTimestamp = now,
+            amountPaid = amountPaid,
+            updatedAt = now
+        )
     }
 
     private fun getStartOfWeekTimestamp(): Long {

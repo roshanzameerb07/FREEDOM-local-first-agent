@@ -3,13 +3,7 @@ package com.example.freedom.domain.ai
 import android.util.Log
 import com.example.freedom.data.local.entity.MilkRecordEntity
 import com.example.freedom.data.repository.MilkRecordRepository
-import com.google.ai.edge.litertlm.Content
-import com.google.ai.edge.litertlm.Message
-import com.google.ai.edge.litertlm.MessageCallback
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 import org.json.JSONObject
 
 /**
@@ -20,12 +14,12 @@ data class QueryEngineResult(
     val summary: String,
     val records: List<MilkRecordEntity> = emptyList(),
     val success: Boolean = true,
-    val executionPipelineDescription: String = "Local SQLite deterministic query execution (Offline)",
+    val executionPipelineDescription: String = "Local SQLite deterministic query execution",
     val isDeterministicEngine: Boolean = true
 )
 
 /**
- * Sealed result type returned by the local engine.
+ * Sealed result type returned by the local query engine.
  */
 sealed class LocalEngineResult {
     data class ToolResult(val request: ToolRequest) : LocalEngineResult()
@@ -61,61 +55,46 @@ class LocalDeterministicQueryEngine(
 
     suspend fun executeQuery(userPrompt: String): LocalEngineResult {
         // ---------- 1. PRIMARY PATH: REAL ON-DEVICE GEMMA INFERENCE ----------
-        val engine = AIEngineProvider.engine
-        if (engine != null && engine.isInitialized()) {
+        if (AIEngineProvider.isAvailable()) {
             try {
                 logD("LocalDeterministicQueryEngine", "Invoking on-device Gemma for prompt: $userPrompt")
-                val conversation = engine.createConversation()
-                try {
-                    val prompt = LocalContextBuilder.buildIntentRoutingPrompt(userPrompt)
-                    val rawOutput = suspendCancellableCoroutine<String> { cont ->
-                        val sb = StringBuilder()
-                        conversation.sendMessageAsync(prompt, object : MessageCallback {
-                            override fun onMessage(message: Message) {
-                                for (content in message.contents.contents) {
-                                    if (content is Content.Text) {
-                                        sb.append(content.text)
-                                    }
-                                }
-                            }
+                val prompt = LocalContextBuilder.buildIntentRoutingPrompt(userPrompt)
+                val rawOutput = AIEngineProvider.generateText(prompt)
 
-                            override fun onDone() {
-                                if (cont.isActive) {
-                                    cont.resume(sb.toString().trim())
-                                }
-                            }
-
-                            override fun onError(throwable: Throwable) {
-                                if (cont.isActive) {
-                                    cont.resumeWithException(throwable)
-                                }
-                            }
-                        })
-                    }
+                if (!rawOutput.isNullOrBlank()) {
                     logD("LocalDeterministicQueryEngine", "Gemma raw output: $rawOutput")
                     val parsedRequest = parseGemmaResponse(rawOutput, userPrompt)
                     if (parsedRequest != null) {
-                        logI("LocalDeterministicQueryEngine", "Gemma extracted intent: ${parsedRequest.intent} with args: ${parsedRequest.args}")
-                        return LocalEngineResult.ToolResult(parsedRequest)
+                        logI(
+                            "LocalDeterministicQueryEngine",
+                            "GEMMA_EXECUTED: Intent=${parsedRequest.intent}, Args=${parsedRequest.args}"
+                        )
+                        return LocalEngineResult.ToolResult(
+                            parsedRequest.copy(executionMode = ExecutionMode.GEMMA_EXECUTED)
+                        )
                     } else {
-                        logW("LocalDeterministicQueryEngine", "Could not parse JSON from Gemma output: $rawOutput")
+                        logW("LocalDeterministicQueryEngine", "GEMMA_PARSE_FAILED: Could not parse JSON from output: $rawOutput")
+                        return executeFallback(userPrompt, ExecutionMode.GEMMA_PARSE_FAILED)
                     }
-                } finally {
-                    try {
-                        conversation.close()
-                    } catch (_: Exception) {}
+                } else {
+                    logW("LocalDeterministicQueryEngine", "GEMMA_INFERENCE_EMPTY: No response generated from Gemma")
+                    return executeFallback(userPrompt, ExecutionMode.GEMMA_UNAVAILABLE)
                 }
             } catch (e: Exception) {
                 logE("LocalDeterministicQueryEngine", "Gemma inference failed: ${e.message}", e)
+                return executeFallback(userPrompt, ExecutionMode.GEMMA_UNAVAILABLE)
             }
         } else {
-            logD("LocalDeterministicQueryEngine", "Gemma engine not ready or not initialized, using deterministic fallback")
+            logD("LocalDeterministicQueryEngine", "GEMMA_UNAVAILABLE: Engine not ready or model file missing")
+            return executeFallback(userPrompt, ExecutionMode.GEMMA_UNAVAILABLE)
         }
-
-        // ---------- 2. FALLBACK PATH: DETERMINISTIC PATTERN MATCHING ----------
-        return executeFallback(userPrompt)
     }
 
+    /**
+     * Parses the raw JSON response emitted by Gemma.
+     * Note: Does NOT override Gemma's intent with broad keywords!
+     * Validates intent and reconciles numeric parameters deterministically.
+     */
     fun parseGemmaResponse(raw: String, userPrompt: String = ""): ToolRequest? {
         try {
             var clean = raw.trim()
@@ -149,7 +128,7 @@ class LocalDeterministicQueryEngine(
                 needsConfirmationExplicit = json.optBoolean("needsConfirmation", false)
                 question = json.optString("question").takeIf { it.isNotEmpty() }
             } catch (_: Throwable) {
-                // Regex parser fallback for host tests or malformed JSON
+                // Regex parser fallback for malformed JSON formatting
                 val intentMatch = Regex("\"intent\"\\s*:\\s*\"([A-Za-z0-9_]+)\"", RegexOption.IGNORE_CASE).find(clean)
                 if (intentMatch != null) {
                     intentStr = intentMatch.groupValues[1].uppercase()
@@ -171,39 +150,26 @@ class LocalDeterministicQueryEngine(
 
             if (intentStr.isNullOrEmpty()) return null
 
-            val intent = try {
+            // Validate against the registered capabilities enum
+            val validatedIntent = try {
                 ToolIntent.valueOf(intentStr)
             } catch (_: Exception) {
                 ToolIntent.UNKNOWN_OR_UNSUPPORTED
             }
 
-            var resolvedIntent = intent
-            val lower = userPrompt.lowercase()
-            if (lower.contains("officer id") || lower.contains("worker id") || lower.contains("assigned area") || lower.contains("my center")) {
-                resolvedIntent = ToolIntent.GET_WORKER_PROFILE
-            } else if (lower.contains("how many farmers") || lower.contains("farmers covered") || lower.contains("farmers visited")) {
-                resolvedIntent = ToolIntent.COUNT_FARMERS_COVERED
-            } else if (lower.contains("this week") || lower.contains("weekly")) {
-                resolvedIntent = ToolIntent.GET_WEEKLY_WORKER_SUMMARY
-            } else if ((intent == ToolIntent.GET_ORGANIZATION_INFO || intent == ToolIntent.UNKNOWN_OR_UNSUPPORTED) &&
-                (lower.contains("payment") && (lower.contains("complete") || lower.contains("condition") || lower.contains("rule")) ||
-                 lower.contains("quality standard") || lower.contains("snf minimum") || lower.contains("rejected milk") || lower.contains("spoilage") || lower.contains("sync protocol"))
-            ) {
-                resolvedIntent = ToolIntent.SEARCH_LOCAL_KNOWLEDGE
-            }
-
-            // Numeric fidelity reconciliation
-            val reconciledArgs = if (resolvedIntent == ToolIntent.CREATE_MILK_RECORD && userPrompt.isNotEmpty()) {
+            // Numeric fidelity reconciliation for record creation
+            val reconciledArgs = if (validatedIntent == ToolIntent.CREATE_MILK_RECORD && userPrompt.isNotEmpty()) {
                 NumberFidelityReconciler.reconcile(userPrompt, rawArgsMap)
             } else {
                 rawArgsMap.toMutableMap().apply {
-                    if (resolvedIntent == ToolIntent.SEARCH_LOCAL_KNOWLEDGE && (get("query").isNullOrBlank() || get("query") == "dairy_cooperative")) {
+                    if (validatedIntent == ToolIntent.SEARCH_LOCAL_KNOWLEDGE && (get("query").isNullOrBlank() || get("query") == "dairy_cooperative")) {
                         put("query", userPrompt)
                     }
-                    if (resolvedIntent == ToolIntent.COUNT_FARMERS_COVERED && !containsKey("period")) {
+                    if (validatedIntent == ToolIntent.COUNT_FARMERS_COVERED && !containsKey("period")) {
+                        val lower = userPrompt.lowercase()
                         put("period", if (lower.contains("week")) "week" else "today")
                     }
-                    if (resolvedIntent == ToolIntent.GET_WEEKLY_WORKER_SUMMARY && !containsKey("farmerName")) {
+                    if (validatedIntent == ToolIntent.GET_WEEKLY_WORKER_SUMMARY && !containsKey("farmerName")) {
                         val farmerMatch = Regex("how much did\\s+([A-Za-z]+)\\s+give this week", RegexOption.IGNORE_CASE).find(userPrompt)
                             ?: Regex("([A-Za-z]+).*this week", RegexOption.IGNORE_CASE).find(userPrompt)
                         val fName = farmerMatch?.groupValues?.get(1)?.replaceFirstChar { it.uppercase() }
@@ -214,25 +180,30 @@ class LocalDeterministicQueryEngine(
                 }
             }
 
-            val needsConfirmation = if (resolvedIntent == ToolIntent.CREATE_MILK_RECORD) {
+            val needsConfirmation = if (validatedIntent == ToolIntent.CREATE_MILK_RECORD) {
                 true
             } else {
                 needsConfirmationExplicit
             }
 
             return ToolRequest(
-                intent = resolvedIntent,
+                intent = validatedIntent,
                 args = reconciledArgs,
                 rawArgs = rawArgsMap,
                 needsConfirmation = needsConfirmation,
-                clarificationQuestion = question
+                clarificationQuestion = question,
+                executionMode = ExecutionMode.GEMMA_EXECUTED
             )
         } catch (e: Exception) {
             return null
         }
     }
 
-    suspend fun executeFallback(userPrompt: String): LocalEngineResult {
+    /**
+     * Emergency fallback executed ONLY when Gemma is unavailable or JSON parsing fails.
+     */
+    suspend fun executeFallback(userPrompt: String, mode: ExecutionMode): LocalEngineResult {
+        logI("LocalDeterministicQueryEngine", "Running fallback with mode: $mode")
         val lowerPrompt = userPrompt.lowercase()
 
         // 1. CREATE_MILK_RECORD fallback
@@ -256,7 +227,8 @@ class LocalDeterministicQueryEngine(
                     intent = ToolIntent.CREATE_MILK_RECORD,
                     args = args,
                     rawArgs = args,
-                    needsConfirmation = true
+                    needsConfirmation = true,
+                    executionMode = mode
                 )
             )
         }
@@ -267,7 +239,7 @@ class LocalDeterministicQueryEngine(
             lowerPrompt.contains("my center") || lowerPrompt.contains("my profile")
         ) {
             return LocalEngineResult.ToolResult(
-                ToolRequest(ToolIntent.GET_WORKER_PROFILE, emptyMap(), needsConfirmation = false)
+                ToolRequest(ToolIntent.GET_WORKER_PROFILE, emptyMap(), needsConfirmation = false, executionMode = mode)
             )
         }
 
@@ -276,7 +248,7 @@ class LocalDeterministicQueryEngine(
             lowerPrompt.contains("which union") || lowerPrompt.contains("which org")
         ) {
             return LocalEngineResult.ToolResult(
-                ToolRequest(ToolIntent.GET_ORGANIZATION_INFO, emptyMap(), needsConfirmation = false)
+                ToolRequest(ToolIntent.GET_ORGANIZATION_INFO, emptyMap(), needsConfirmation = false, executionMode = mode)
             )
         }
 
@@ -286,7 +258,7 @@ class LocalDeterministicQueryEngine(
         ) {
             val period = if (lowerPrompt.contains("week")) "week" else "today"
             return LocalEngineResult.ToolResult(
-                ToolRequest(ToolIntent.COUNT_FARMERS_COVERED, mapOf("period" to period), needsConfirmation = false)
+                ToolRequest(ToolIntent.COUNT_FARMERS_COVERED, mapOf("period" to period), needsConfirmation = false, executionMode = mode)
             )
         }
 
@@ -301,21 +273,21 @@ class LocalDeterministicQueryEngine(
                 emptyMap()
             }
             return LocalEngineResult.ToolResult(
-                ToolRequest(ToolIntent.GET_WEEKLY_WORKER_SUMMARY, args, needsConfirmation = false)
+                ToolRequest(ToolIntent.GET_WEEKLY_WORKER_SUMMARY, args, needsConfirmation = false, executionMode = mode)
             )
         }
 
         // 6. GET_TODAY_WORKER_SUMMARY fallback
         if (lowerPrompt.contains("my activity today") || lowerPrompt.contains("my collections today")) {
             return LocalEngineResult.ToolResult(
-                ToolRequest(ToolIntent.GET_TODAY_WORKER_SUMMARY, emptyMap(), needsConfirmation = false)
+                ToolRequest(ToolIntent.GET_TODAY_WORKER_SUMMARY, emptyMap(), needsConfirmation = false, executionMode = mode)
             )
         }
 
         // 7. GET_PENDING_PAYMENTS fallback
         if (lowerPrompt.contains("payment") && (lowerPrompt.contains("pending") || lowerPrompt.contains("unpaid") || lowerPrompt.contains("due"))) {
             return LocalEngineResult.ToolResult(
-                ToolRequest(ToolIntent.GET_PENDING_PAYMENTS, emptyMap(), needsConfirmation = false)
+                ToolRequest(ToolIntent.GET_PENDING_PAYMENTS, emptyMap(), needsConfirmation = false, executionMode = mode)
             )
         }
 
@@ -325,21 +297,21 @@ class LocalDeterministicQueryEngine(
         if (farmerHistoryMatch != null && !lowerPrompt.contains("gave") && !lowerPrompt.contains("this week")) {
             val farmerName = farmerHistoryMatch.groupValues[1].replaceFirstChar { it.uppercase() }
             return LocalEngineResult.ToolResult(
-                ToolRequest(ToolIntent.GET_FARMER_HISTORY, mapOf("farmerName" to farmerName), needsConfirmation = false)
+                ToolRequest(ToolIntent.GET_FARMER_HISTORY, mapOf("farmerName" to farmerName), needsConfirmation = false, executionMode = mode)
             )
         }
 
         // 9. GET_TODAY_SUMMARY fallback
         if (lowerPrompt.contains("today") || lowerPrompt.contains("collected today")) {
             return LocalEngineResult.ToolResult(
-                ToolRequest(ToolIntent.GET_TODAY_SUMMARY, emptyMap(), needsConfirmation = false)
+                ToolRequest(ToolIntent.GET_TODAY_SUMMARY, emptyMap(), needsConfirmation = false, executionMode = mode)
             )
         }
 
         // 10. GET_PENDING_UPLOADS fallback
         if (lowerPrompt.contains("upload") || lowerPrompt.contains("sync queue")) {
             return LocalEngineResult.ToolResult(
-                ToolRequest(ToolIntent.GET_PENDING_UPLOADS, emptyMap(), needsConfirmation = false)
+                ToolRequest(ToolIntent.GET_PENDING_UPLOADS, emptyMap(), needsConfirmation = false, executionMode = mode)
             )
         }
 
@@ -350,15 +322,15 @@ class LocalDeterministicQueryEngine(
             lowerPrompt.contains("sync protocol") || lowerPrompt.contains("quota")
         ) {
             return LocalEngineResult.ToolResult(
-                ToolRequest(ToolIntent.SEARCH_LOCAL_KNOWLEDGE, mapOf("query" to userPrompt), needsConfirmation = false)
+                ToolRequest(ToolIntent.SEARCH_LOCAL_KNOWLEDGE, mapOf("query" to userPrompt), needsConfirmation = false, executionMode = ExecutionMode.RAG_EXECUTION)
             )
         }
 
         // 12. Generic summary fallback
         val records = repository.getAllRecords().first()
-        val summary = "Deterministic Engine: Processed query offline. ${records.size} total local record(s) on device."
+        val summary = "${records.size} local record(s) on device."
         return LocalEngineResult.SummaryResult(
-            QueryEngineResult(userPrompt, summary, records, true, "Local SQLite deterministic query execution (Offline)")
+            QueryEngineResult(userPrompt, summary, records, true, "Local SQLite query", true)
         )
     }
 }

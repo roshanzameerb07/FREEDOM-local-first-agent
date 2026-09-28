@@ -1,6 +1,8 @@
 package com.example.freedom.ui.screens.records
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -11,9 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -35,18 +35,22 @@ fun LocalRecordsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
+    var paymentDialogRecord by remember { mutableStateOf<MilkRecordEntity?>(null) }
+    var selectedMethod by remember { mutableStateOf(MilkRecordEntity.METHOD_CASH) }
+    var referenceInput by remember { mutableStateOf("") }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Column {
                         Text(
-                            text = "Local Records",
+                            text = "Records & Payments",
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
                         Text(
-                            text = "${uiState.totalCount} entries (${String.format("%.1f", uiState.totalQuantityLitres)} L)",
+                            text = "${uiState.totalCount} entries • ${String.format("%.1f", uiState.totalQuantityLitres)} L total",
                             style = MaterialTheme.typography.bodySmall,
                             color = Color.White.copy(alpha = 0.85f)
                         )
@@ -74,47 +78,18 @@ fun LocalRecordsScreen(
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            // Local Offline Badge
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = OfflineGreenBg,
-                shape = RoundedCornerShape(10.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, OfflineGreen.copy(alpha = 0.3f))
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Storage,
-                        contentDescription = null,
-                        tint = OfflineGreen,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Source of Truth: Stored Locally on Device (Offline)",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = OfflineGreen
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Local Search Bar
+            // Search Bar
             OutlinedTextField(
                 value = uiState.searchQuery,
                 onValueChange = { viewModel.onSearchQueryChange(it) },
-                placeholder = { Text("Search by farmer name (e.g. Ramesh)...") },
+                placeholder = { Text("Search by farmer name...") },
                 leadingIcon = {
                     Icon(Icons.Default.Search, contentDescription = null, tint = PrimaryGreen)
                 },
                 trailingIcon = {
                     if (uiState.searchQuery.isNotEmpty()) {
                         IconButton(onClick = { viewModel.onSearchQueryChange("") }) {
-                            Icon(Icons.Default.Close, contentDescription = "Clear search", tint = TextTertiary)
+                            Icon(Icons.Default.Close, contentDescription = "Clear", tint = TextTertiary)
                         }
                     }
                 },
@@ -140,53 +115,29 @@ fun LocalRecordsScreen(
                     FilterChip(
                         selected = uiState.paymentFilter == null,
                         onClick = { viewModel.onPaymentFilterChange(null) },
-                        label = { Text("All Payments") },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = PrimaryGreen,
-                            selectedLabelColor = Color.White
-                        )
+                        label = { Text("All Records") }
                     )
                 }
 
                 item {
                     FilterChip(
-                        selected = uiState.paymentFilter == "PENDING",
-                        onClick = { viewModel.onPaymentFilterChange("PENDING") },
-                        label = { Text("Payment Pending") },
-                        leadingIcon = if (uiState.paymentFilter == "PENDING") {
+                        selected = uiState.paymentFilter == MilkRecordEntity.PAYMENT_PENDING,
+                        onClick = { viewModel.onPaymentFilterChange(MilkRecordEntity.PAYMENT_PENDING) },
+                        label = { Text("Pending Payment") },
+                        leadingIcon = if (uiState.paymentFilter == MilkRecordEntity.PAYMENT_PENDING) {
+                            { Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        } else null
+                    )
+                }
+
+                item {
+                    FilterChip(
+                        selected = uiState.paymentFilter == MilkRecordEntity.PAYMENT_RECORDED_LOCALLY || uiState.paymentFilter == MilkRecordEntity.PAYMENT_PAID,
+                        onClick = { viewModel.onPaymentFilterChange(MilkRecordEntity.PAYMENT_RECORDED_LOCALLY) },
+                        label = { Text("Payment Recorded") },
+                        leadingIcon = if (uiState.paymentFilter == MilkRecordEntity.PAYMENT_RECORDED_LOCALLY) {
                             { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                        } else null,
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = PendingAmber,
-                            selectedLabelColor = Color.White
-                        )
-                    )
-                }
-
-                item {
-                    FilterChip(
-                        selected = uiState.paymentFilter == "PAID",
-                        onClick = { viewModel.onPaymentFilterChange("PAID") },
-                        label = { Text("Payment Paid") },
-                        leadingIcon = if (uiState.paymentFilter == "PAID") {
-                            { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                        } else null,
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = PaidGreen,
-                            selectedLabelColor = Color.White
-                        )
-                    )
-                }
-
-                item {
-                    FilterChip(
-                        selected = uiState.uploadFilter == "PENDING",
-                        onClick = { viewModel.onUploadFilterChange("PENDING") },
-                        label = { Text("Pending Sync") },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = TextSecondary,
-                            selectedLabelColor = Color.White
-                        )
+                        } else null
                     )
                 }
             }
@@ -197,201 +148,242 @@ fun LocalRecordsScreen(
             if (uiState.records.isEmpty()) {
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(32.dp),
+                        .fillMaxWidth()
+                        .weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(
-                            imageVector = Icons.Default.SearchOff,
+                            imageVector = Icons.Default.FolderOpen,
                             contentDescription = null,
                             tint = TextTertiary,
-                            modifier = Modifier.size(56.dp)
+                            modifier = Modifier.size(48.dp)
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = "No local records match query",
+                            text = "No collection records found",
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
                             color = TextSecondary
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Try clearing filters or search term",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextTertiary
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        OutlinedButton(
-                            onClick = { viewModel.clearFilters() }
-                        ) {
-                            Text("Reset Filters")
-                        }
                     }
                 }
             } else {
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.weight(1f)
                 ) {
                     items(uiState.records, key = { it.id }) { record ->
-                        RecordCardItem(record = record)
+                        RecordCardItem(
+                            record = record,
+                            onRecordPaymentClick = {
+                                paymentDialogRecord = record
+                                selectedMethod = MilkRecordEntity.METHOD_CASH
+                                referenceInput = ""
+                            }
+                        )
                     }
                 }
             }
         }
     }
+
+    // Payment Recording Dialog
+    paymentDialogRecord?.let { record ->
+        val amount = record.payableAmount ?: (record.quantity * 37.5)
+        AlertDialog(
+            onDismissRequest = { paymentDialogRecord = null },
+            title = {
+                Text("Record Payment", fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "Farmer: ${record.farmerName}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = "Amount: ₹${"%.2f".format(amount)} (${record.quantity} L)",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = PrimaryGreenDark,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Select Payment Method:", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = selectedMethod == MilkRecordEntity.METHOD_CASH,
+                            onClick = { selectedMethod = MilkRecordEntity.METHOD_CASH },
+                            label = { Text("Cash") }
+                        )
+                        FilterChip(
+                            selected = selectedMethod == MilkRecordEntity.METHOD_UPI,
+                            onClick = { selectedMethod = MilkRecordEntity.METHOD_UPI },
+                            label = { Text("UPI") }
+                        )
+                        FilterChip(
+                            selected = selectedMethod == MilkRecordEntity.METHOD_BANK_TRANSFER,
+                            onClick = { selectedMethod = MilkRecordEntity.METHOD_BANK_TRANSFER },
+                            label = { Text("Bank") }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = referenceInput,
+                        onValueChange = { referenceInput = it },
+                        label = { Text("Reference / Receipt Number") },
+                        placeholder = { Text("e.g. REC-102") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Saved locally on device. Awaiting bank reconciliation.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextSecondary
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.recordPayment(record.id, selectedMethod, referenceInput)
+                        paymentDialogRecord = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryGreen)
+                ) {
+                    Text("Save Payment")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { paymentDialogRecord = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 @Composable
-fun RecordCardItem(record: MilkRecordEntity) {
-    val dateFormatter = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
-    val formattedDate = dateFormatter.format(Date(record.createdAt))
+fun RecordCardItem(
+    record: MilkRecordEntity,
+    onRecordPaymentClick: () -> Unit = {}
+) {
+    val dateFormat = remember { SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault()) }
+    val formattedDate = remember(record.createdAt) { dateFormat.format(Date(record.createdAt)) }
+    val isPending = record.paymentStatus == MilkRecordEntity.PAYMENT_PENDING
+    val amount = record.payableAmount ?: (record.quantity * 37.5)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = CardBackground),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(14.dp)
-        ) {
+        Column(modifier = Modifier.padding(14.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .background(PrimaryContainer, shape = CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = record.farmerName.take(1).uppercase(),
-                            fontWeight = FontWeight.Black,
-                            color = PrimaryGreenDark,
-                            fontSize = 18.sp
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = record.farmerName,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
-                        )
-                        Text(
-                            text = formattedDate,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextTertiary
-                        )
-                    }
+                Column {
+                    Text(
+                        text = record.farmerName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = formattedDate,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextTertiary
+                    )
                 }
 
-                // Quantity Highlight Badge
-                Surface(
-                    color = PrimaryContainer,
-                    shape = RoundedCornerShape(8.dp)
-                ) {
+                Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = "${String.format("%.1f", record.quantity)} L",
-                        style = MaterialTheme.typography.titleMedium,
+                        text = "${record.quantity} L",
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Black,
-                        color = PrimaryGreenDark,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        color = PrimaryGreen
+                    )
+                    Text(
+                        text = "₹${"%.2f".format(amount)}",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextSecondary
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Metrics Row: Fat, SNF
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                MetricSnippet(label = "Fat", value = "${String.format("%.1f", record.fat)}%")
-                MetricSnippet(label = "SNF", value = "${String.format("%.1f", record.snf)}%")
-                MetricSnippet(label = "Local ID", value = "#${record.id.take(6)}")
-            }
-
+            Spacer(modifier = Modifier.height(10.dp))
+            HorizontalDivider(color = Gray100)
             Spacer(modifier = Modifier.height(10.dp))
 
-            HorizontalDivider(color = OutlineColor.copy(alpha = 0.6f))
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Status Badges (Payment Status & Upload Status)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Payment Status
-                val isPaid = record.paymentStatus == MilkRecordEntity.PAYMENT_PAID
-                Surface(
-                    color = if (isPaid) PaidGreenBg else PendingAmberBg,
-                    shape = RoundedCornerShape(6.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .background(if (isPaid) PaidGreen else PendingAmber, shape = CircleShape)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = if (isPaid) "Payment Paid" else "Payment Pending",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isPaid) PaidGreen else PendingAmber
-                        )
-                    }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "Fat: ${record.fat}%",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = TextSecondary
+                    )
+                    Text(
+                        text = "SNF: ${record.snf}%",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = TextSecondary
+                    )
                 }
 
-                // Upload Status
-                val isUploaded = record.uploadStatus == MilkRecordEntity.UPLOAD_STATUS_UPLOADED
                 Surface(
-                    color = if (isUploaded) InfoBlueBg else SurfaceLight,
                     shape = RoundedCornerShape(6.dp),
-                    border = if (!isUploaded) androidx.compose.foundation.BorderStroke(1.dp, OutlineColor) else null
+                    color = if (isPending) PendingAmber.copy(alpha = 0.12f) else OfflineGreenBg
                 ) {
                     Text(
-                        text = if (isUploaded) "Uploaded" else "Stored Locally (Pending Sync)",
+                        text = if (isPending) "Pending Payment" else "Recorded (${record.paymentMethod ?: "Cash"})",
                         style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Medium,
-                        color = if (isUploaded) InfoBlue else TextSecondary,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isPending) PendingAmber else OfflineGreen,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
                 }
             }
-        }
-    }
-}
 
-@Composable
-fun MetricSnippet(label: String, value: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text = "$label: ",
-            style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary,
-            fontWeight = FontWeight.Normal
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.Bold,
-            color = TextPrimary
-        )
+            if (isPending) {
+                Spacer(modifier = Modifier.height(10.dp))
+                OutlinedButton(
+                    onClick = onRecordPaymentClick,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = PrimaryGreen)
+                ) {
+                    Icon(Icons.Default.Payment, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Record Payment", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                }
+            } else if (!record.paymentReference.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Ref: ${record.paymentReference}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextTertiary
+                )
+            }
+        }
     }
 }

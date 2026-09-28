@@ -5,8 +5,6 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.freedom.data.local.entity.MilkRecordEntity
 import com.example.freedom.data.repository.MilkRecordRepository
-import com.example.freedom.domain.ai.PatternBasedVoiceExtractor
-import com.example.freedom.domain.ai.VoiceRecordExtractorConduit
 import com.example.freedom.domain.validation.MilkRecordValidationResult
 import com.example.freedom.domain.validation.MilkRecordValidator
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,19 +18,26 @@ data class RecordCollectionUiState(
     val quantity: String = "",
     val fat: String = "",
     val snf: String = "",
-    val paymentStatus: String = "PENDING", // Default to PENDING
+    val isPaymentRecorded: Boolean = false,
+    val paymentMethod: String = MilkRecordEntity.METHOD_CASH,
+    val paymentReference: String = "",
     val validationResult: MilkRecordValidationResult? = null,
     val saveSuccess: Boolean = false,
     val lastSavedFarmerName: String? = null,
-    val voiceTranscriptInput: String = "",
-    val isVoiceProcessing: Boolean = false,
-    val voiceExtractionMessage: String? = null
-)
+    val isReviewing: Boolean = false
+) {
+    val estimatedAmount: Double
+        get() {
+            val q = quantity.toDoubleOrNull() ?: 0.0
+            val f = fat.toDoubleOrNull() ?: 0.0
+            val s = snf.toDoubleOrNull() ?: 0.0
+            return MilkRecordEntity.calculatePayableAmount(q, f, s)
+        }
+}
 
 class RecordCollectionViewModel(
     private val repository: MilkRecordRepository,
-    private val validator: MilkRecordValidator = MilkRecordValidator(),
-    private val voiceExtractor: VoiceRecordExtractorConduit = PatternBasedVoiceExtractor()
+    private val validator: MilkRecordValidator = MilkRecordValidator()
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(RecordCollectionUiState())
@@ -54,58 +59,63 @@ class RecordCollectionViewModel(
         _uiState.update { it.copy(snf = value, validationResult = null, saveSuccess = false) }
     }
 
-    fun onPaymentStatusChange(value: String) {
-        _uiState.update { it.copy(paymentStatus = value, validationResult = null, saveSuccess = false) }
+    fun onPaymentRecordedToggle(recorded: Boolean) {
+        _uiState.update { it.copy(isPaymentRecorded = recorded, validationResult = null) }
     }
 
-    fun onVoiceTranscriptChange(value: String) {
-        _uiState.update { it.copy(voiceTranscriptInput = value) }
+    fun onPaymentMethodChange(method: String) {
+        _uiState.update { it.copy(paymentMethod = method) }
     }
 
-    /**
-     * Demonstrates the future Voice -> Local SLM -> Structured Draft pipeline
-     */
-    fun processVoiceSample(sampleTranscript: String = "Ramesh gave 18 litres, fat 4.2 and SNF 8.6. Payment is pending.") {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isVoiceProcessing = true, voiceTranscriptInput = sampleTranscript) }
-            val draft = voiceExtractor.extractRecordFromTranscript(sampleTranscript)
-            _uiState.update {
-                it.copy(
-                    farmerName = draft.farmerName,
-                    quantity = draft.quantity,
-                    fat = draft.fat,
-                    snf = draft.snf,
-                    paymentStatus = draft.paymentStatus,
-                    isVoiceProcessing = false,
-                    voiceExtractionMessage = "Extracted from voice transcript via local AI conduit. Please review & save.",
-                    validationResult = null
-                )
-            }
-        }
+    fun onPaymentReferenceChange(ref: String) {
+        _uiState.update { it.copy(paymentReference = ref) }
     }
 
-    fun saveRecord(onSuccess: () -> Unit) {
-        val currentState = _uiState.value
+    fun onReviewClick() {
+        val state = _uiState.value
         val validation = validator.validate(
-            farmerName = currentState.farmerName,
-            quantityStr = currentState.quantity,
-            fatStr = currentState.fat,
-            snfStr = currentState.snf,
-            paymentStatus = currentState.paymentStatus
+            farmerName = state.farmerName,
+            quantityStr = state.quantity,
+            fatStr = state.fat,
+            snfStr = state.snf,
+            paymentStatus = if (state.isPaymentRecorded) MilkRecordEntity.PAYMENT_RECORDED_LOCALLY else MilkRecordEntity.PAYMENT_PENDING
         )
-
         if (!validation.isValid) {
-            _uiState.update { it.copy(validationResult = validation, saveSuccess = false) }
-            return
+            _uiState.update { it.copy(validationResult = validation) }
+        } else {
+            _uiState.update { it.copy(validationResult = null, isReviewing = true) }
         }
+    }
 
+    fun onDismissReview() {
+        _uiState.update { it.copy(isReviewing = false) }
+    }
+
+    fun confirmAndSave(onSuccess: () -> Unit) {
+        val state = _uiState.value
         viewModelScope.launch {
+            val q = state.quantity.toDouble()
+            val f = state.fat.toDouble()
+            val s = state.snf.toDouble()
+            val amount = MilkRecordEntity.calculatePayableAmount(q, f, s)
+            val paymentStatus = if (state.isPaymentRecorded) MilkRecordEntity.PAYMENT_RECORDED_LOCALLY else MilkRecordEntity.PAYMENT_PENDING
+            val now = System.currentTimeMillis()
+
             val record = MilkRecordEntity(
-                farmerName = currentState.farmerName.trim(),
-                quantity = currentState.quantity.toDouble(),
-                fat = currentState.fat.toDouble(),
-                snf = currentState.snf.toDouble(),
-                paymentStatus = currentState.paymentStatus,
+                orgId = "ORG001",
+                workerId = "WORKER001",
+                farmerName = state.farmerName.trim(),
+                quantity = q,
+                fat = f,
+                snf = s,
+                paymentStatus = paymentStatus,
+                paymentMethod = if (state.isPaymentRecorded) state.paymentMethod else null,
+                paymentReference = if (state.isPaymentRecorded && state.paymentReference.isNotBlank()) state.paymentReference.trim() else null,
+                paymentTimestamp = if (state.isPaymentRecorded) now else null,
+                payableAmount = amount,
+                amountPaid = if (state.isPaymentRecorded) amount else null,
+                createdAt = now,
+                updatedAt = now,
                 uploadStatus = MilkRecordEntity.UPLOAD_STATUS_PENDING
             )
             repository.insertRecord(record)
@@ -116,11 +126,11 @@ class RecordCollectionViewModel(
                     quantity = "",
                     fat = "",
                     snf = "",
-                    paymentStatus = "PENDING",
-                    validationResult = null,
+                    isPaymentRecorded = false,
+                    paymentReference = "",
+                    isReviewing = false,
                     saveSuccess = true,
-                    lastSavedFarmerName = record.farmerName,
-                    voiceExtractionMessage = null
+                    lastSavedFarmerName = record.farmerName
                 )
             }
             onSuccess()
@@ -135,13 +145,12 @@ class RecordCollectionViewModel(
         _uiState.update {
             it.copy(
                 farmerName = "Ramesh",
-                quantity = "18.0",
+                quantity = "18.5",
                 fat = "4.2",
                 snf = "8.6",
-                paymentStatus = "PENDING",
+                isPaymentRecorded = false,
                 validationResult = null,
-                saveSuccess = false,
-                voiceExtractionMessage = null
+                saveSuccess = false
             )
         }
     }
