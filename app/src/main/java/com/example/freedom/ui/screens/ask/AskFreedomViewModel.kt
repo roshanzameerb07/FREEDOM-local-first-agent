@@ -40,7 +40,15 @@ class AskFreedomViewModel(
         if (prompt.trim().isEmpty()) return
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, queryInput = prompt) }
+            _uiState.update {
+                it.copy(
+                    isLoading = true,
+                    queryInput = prompt,
+                    lastResult = null,
+                    executionResult = null,
+                    confirmationRequest = null
+                )
+            }
             val result = queryEngine.executeQuery(prompt)
             when (result) {
                 is com.example.freedom.domain.ai.LocalEngineResult.ToolResult -> {

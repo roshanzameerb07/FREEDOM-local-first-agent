@@ -56,6 +56,40 @@ class MilkRecordRepositoryImpl(
         return dao.getFarmerQuantitySince(farmerName, startOfWeek)
     }
 
+    override suspend fun getDistinctFarmersCount(period: String): Int {
+        return when (period.lowercase()) {
+            "today" -> {
+                val (startOfDay, endOfDay) = getTodayTimestamps()
+                dao.getTodayDistinctFarmersCount(startOfDay, endOfDay)
+            }
+            "week" -> {
+                val startOfWeek = getStartOfWeekTimestamp()
+                dao.getDistinctFarmersCountSince(startOfWeek)
+            }
+            else -> dao.getAllDistinctFarmersCount()
+        }
+    }
+
+    override suspend fun getWeeklyTotalQuantity(): Double {
+        val startOfWeek = getStartOfWeekTimestamp()
+        return dao.getTotalQuantitySince(startOfWeek)
+    }
+
+    override suspend fun getWeeklyRecordsCount(): Int {
+        val startOfWeek = getStartOfWeekTimestamp()
+        return dao.getRecordsCountSince(startOfWeek)
+    }
+
+    private fun getStartOfWeekTimestamp(): Long {
+        val calendar = Calendar.getInstance()
+        calendar.set(Calendar.DAY_OF_WEEK, calendar.firstDayOfWeek)
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+        return calendar.timeInMillis
+    }
+
     /**
      * Prototypes/Simulates the batch sync pipeline.
      * Marks all locally pending records as UPLOADED and returns count of updated records.

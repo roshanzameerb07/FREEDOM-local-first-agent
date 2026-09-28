@@ -1,7 +1,7 @@
 # FREEDOM — Local-First AI Agent for Resource-Constrained Android
 
 ## Overview
-FREEDOM is an offline, privacy-first Android application designed for rural dairy cooperatives and smallholder field agents operating in connectivity-challenged environments. It bridges on-device Small Language Models (SLMs) with deterministic local SQLite database operations to deliver reliable, explainable business actions without cloud dependencies.
+FREEDOM is an offline, privacy-first Android application designed for rural dairy cooperatives and smallholder field agents operating in connectivity-challenged environments. It bridges on-device Small Language Models (SLMs) with deterministic local SQLite database operations and local document RAG retrieval to deliver reliable, explainable business actions without cloud dependencies.
 
 ---
 
@@ -23,83 +23,100 @@ FREEDOM is an offline, privacy-first Android application designed for rural dair
                                   |
                                   v
 +-------------------------------------------------------------------+
+|                       LocalContextBuilder                         |
+|   - Constructs minimal, tailored prompts for Gemma 3 1B IT        |
+|   - Defines strict JSON structure & numerical accuracy rules      |
++-------------------------------------------------------------------+
+                                  |
+                                  v
++-------------------------------------------------------------------+
 |            ON-DEVICE GEMMA 3 1B IT (LiteRT-LM Engine)             |
-|   - System Instruction: Strictly map request to ToolRequest JSON  |
-|   - Output: JSON containing intent, args, needsConfirmation       |
+|   - Responsible for intent classification & argument extraction   |
+|   - Never computes totals, counts, or modifies SQLite directly    |
 +-------------------------------------------------------------------+
                                   |
                                   v
 +-------------------------------------------------------------------+
-|                 STRUCTURED ToolRequest EXTRACTION                 |
-|   - Robust JSON extraction (handles markdown fences, trims)       |
-|   - Fallback: Deterministic Regex/Pattern matching if SLM offline |
+|                    NumberFidelityReconciler                       |
+|   - Cross-references extracted args against raw prompt            |
+|   - Restores exact decimals (e.g. 18.5, 4.2, 8.6) without loss    |
+|   - Distinguishes missing values from 0.0 (prevents defaults)     |
 +-------------------------------------------------------------------+
                                   |
                                   v
 +-------------------------------------------------------------------+
-|                     DETERMINISTIC VALIDATION                      |
-|   - MilkRecordValidator verifies farmer name, quantity, fat, snf  |
-|   - Rejects missing/negative/out-of-bound values without writing   |
+|              DETERMINISTIC VALIDATION & EXECUTION                 |
+|   - MilkRecordValidator verifies bounds (fat/snf: 0-15%, qty > 0) |
+|   - Blocks writes on incomplete data (e.g. "Ramesh gave 80 L")    |
+|   - Executes Room SQLite queries, Profile queries, or Local RAG   |
 +-------------------------------------------------------------------+
                                   |
-                                  v
-+-------------------------------------------------------------------+
-|                    CONFIRMATION WHEN REQUIRED                     |
-|   - Record creation always requires explicit user review & confirm|
-|   - Incomplete or ambiguous data displays warnings                |
-+-------------------------------------------------------------------+
-                                  | (Upon User Confirmation)
-                                  v
-+-------------------------------------------------------------------+
-|                     ToolExecutor (Kotlin Layer)                   |
-|   - Validates args once more; never defaults to 0.0               |
-|   - Executes Room DAO operations                                  |
-+-------------------------------------------------------------------+
-                                  |
-                                  v
-+-------------------------------------------------------------------+
-|                       ROOM / LOCAL SQLITE DB                      |
-|   - Entity: MilkRecordEntity                                      |
-|   - DAO: MilkRecordDao                                            |
-|   - Repository: MilkRecordRepository                              |
-+-------------------------------------------------------------------+
+       +--------------------------+--------------------------+
+       |                          |                          |
+       v                          v                          v
++--------------+           +--------------+           +--------------+
+|  Room SQLite |           | Local Profile|           |  Local RAG   |
+| (DB Records, |           | (Officer ID, |           | (Cooperative |
+| Totals,      |           |  Area, Union |           |  SOPs, Rules,|
+|  Counts)     |           |  Metadata)   |           |  Citations)  |
++--------------+           +--------------+           +--------------+
+       |                          |                          |
+       +--------------------------+--------------------------+
                                   |
                                   v
 +-------------------------------------------------------------------+
 |                     UI RESPONSE / RESULT CARD                     |
-|   - Execution status (success or validation failure)              |
-|   - Real-time matching local records display                      |
-|   - 100% Offline verification indicator                           |
+|   - Capability Badge + Source of Truth Badge                      |
+|   - Extracted Parameters breakdown (exact precision)              |
+|   - Calculation summary / Verified Answer                         |
+|   - Grounded RAG Evidence Box (Document Title, Section, Quote)    |
+|   - 100% Offline verification status                              |
 +-------------------------------------------------------------------+
 ```
 
 ---
 
-## Tool Registry (6 Core Intents)
+## Tool Registry (Capabilities)
 
 1. **`CREATE_MILK_RECORD`**
    - *Arguments:* `farmerName` (String), `quantity` (Double), `fat` (Double), `snf` (Double), `paymentStatus` (String: PENDING/PAID).
-   - *Behavior:* Strict deterministic validation. Always prompts for confirmation dialog before Room insertion. Incomplete inputs (e.g. "Ramesh gave 80 litres") are blocked from saving until required metrics are provided.
+   - *Behavior:* Strict deterministic validation. Decimal fidelity guaranteed via `NumberFidelityReconciler`. Mandatory user confirmation before Room insertion. Missing fields abort database write.
 
-2. **`SEARCH_FARMERS`**
-   - *Arguments:* `query` (String).
-   - *Behavior:* Queries local Room database for matching farmer records and returns result list.
-
-3. **`GET_FARMER_HISTORY`**
+2. **`GET_FARMER_HISTORY`**
    - *Arguments:* `farmerName` (String).
-   - *Behavior:* Retrieves all historical milk deliveries for the requested farmer directly from SQLite.
+   - *Behavior:* Retrieves historical milk deliveries for the requested farmer directly from SQLite and calculates total volume.
+
+3. **`GET_PENDING_PAYMENTS`**
+   - *Arguments:* None.
+   - *Behavior:* Filters local records where `paymentStatus == 'PENDING'`, showing count and pending litres.
 
 4. **`GET_TODAY_SUMMARY`**
    - *Arguments:* None.
-   - *Behavior:* Computes total litres collected and total record count on device for the current calendar day.
+   - *Behavior:* Computes total litres and records collected on device today.
 
-5. **`GET_PENDING_PAYMENTS`**
+5. **`GET_WORKER_PROFILE`**
    - *Arguments:* None.
-   - *Behavior:* Filters local records where `paymentStatus == 'PENDING'`, showing count and total litres due.
+   - *Behavior:* Deterministically returns the active field officer ID (`WORKER001`), name (`Ramesh K.`), assigned area (`Sector 4 — North Mandya Milk Route`), and center.
 
-6. **`GET_PENDING_UPLOADS`**
+6. **`GET_ORGANIZATION_INFO`**
    - *Arguments:* None.
-   - *Behavior:* Lists local records queued for future batch synchronization (`uploadStatus == 'PENDING'`).
+   - *Behavior:* Returns cooperative union metadata, registration number, and regional district.
+
+7. **`COUNT_FARMERS_COVERED`**
+   - *Arguments:* `period` ("today" | "week" | "all").
+   - *Behavior:* Executes `SELECT COUNT(DISTINCT LOWER(farmerName))` from Room SQLite.
+
+8. **`GET_WEEKLY_WORKER_SUMMARY`**
+   - *Arguments:* `farmerName` (optional).
+   - *Behavior:* Calculates weekly collection volume, records, and distinct farmers from local SQLite.
+
+9. **`SEARCH_LOCAL_KNOWLEDGE` (RAG)**
+   - *Arguments:* `query` (String).
+   - *Behavior:* Performs BM25-style lexical search over chunked organization documents (Payment Completion Policy, Quality Standards, Spoilage/Rejection Procedures, Sync Protocols). Returns grounded citation and exact quote. Rejects unanswerable queries with zero hallucination.
+
+10. **`GET_PENDING_UPLOADS`**
+    - *Arguments:* None.
+    - *Behavior:* Lists local records queued for future batch synchronization.
 
 ---
 
@@ -110,6 +127,7 @@ FREEDOM is an offline, privacy-first Android application designed for rural dair
 ---
 
 ## Current Development Status
-- **Build Status:** Compiles with Android Gradle Plugin 9.0.1, Kotlin 2.3.20, Compose BOM 2026.03.01.
-- **Unit Tests:** 100% passing across Validator, Repository, Voice Extractor, and QueryEngine tests.
-- **Model Verification:** Verified real `gemma3-1b-it-int4.litertlm` artifact placed in internal storage and loaded by LiteRT-LM Engine on physical device.
+- **Build Status:** Compiles cleanly with Android Gradle Plugin 9.0.1, Kotlin 2.3.20, Compose BOM 2026.03.01.
+- **Unit Tests:** 30/30 unit tests pass green across `NumberFidelityReconcilerTest`, `LocalRagRetrieverTest`, `LocalDeterministicQueryEngineTest`, `MilkRecordValidatorTest`, `PatternBasedVoiceExtractorTest`, and `AuthRepositoryTest`.
+- **Physical Device Tested:** Samsung Galaxy (`RZCY90ETLVZ`) with official Gemma 3 1B IT (`gemma3-1b-it-int4.litertlm`).
+- **Airplane Mode Verified:** 100% offline execution verified with Wi-Fi and Cellular disabled.

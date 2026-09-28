@@ -53,6 +53,21 @@ interface MilkRecordDao {
     @Query("SELECT COALESCE(SUM(quantity), 0.0) FROM milk_records WHERE LOWER(farmerName) LIKE '%' || LOWER(:farmerName) || '%' AND createdAt >= :sinceTimestamp")
     suspend fun getFarmerQuantitySince(farmerName: String, sinceTimestamp: Long): Double
 
+    @Query("SELECT COUNT(DISTINCT LOWER(farmerName)) FROM milk_records WHERE createdAt >= :startOfDay AND createdAt <= :endOfDay")
+    suspend fun getTodayDistinctFarmersCount(startOfDay: Long, endOfDay: Long): Int
+
+    @Query("SELECT COUNT(DISTINCT LOWER(farmerName)) FROM milk_records WHERE createdAt >= :sinceTimestamp")
+    suspend fun getDistinctFarmersCountSince(sinceTimestamp: Long): Int
+
+    @Query("SELECT COUNT(DISTINCT LOWER(farmerName)) FROM milk_records")
+    suspend fun getAllDistinctFarmersCount(): Int
+
+    @Query("SELECT COALESCE(SUM(quantity), 0.0) FROM milk_records WHERE createdAt >= :sinceTimestamp")
+    suspend fun getTotalQuantitySince(sinceTimestamp: Long): Double
+
+    @Query("SELECT COUNT(*) FROM milk_records WHERE createdAt >= :sinceTimestamp")
+    suspend fun getRecordsCountSince(sinceTimestamp: Long): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRecord(record: MilkRecordEntity)
 
@@ -65,3 +80,4 @@ interface MilkRecordDao {
     @Query("UPDATE milk_records SET uploadStatus = 'UPLOADED' WHERE uploadStatus = 'PENDING'")
     suspend fun markAllPendingAsUploaded(): Int
 }
+

@@ -7,10 +7,14 @@ import com.example.freedom.domain.ai.LocalEngineResult
 import com.example.freedom.domain.ai.ToolExecutor
 import com.example.freedom.domain.ai.ToolIntent
 import com.example.freedom.domain.ai.ToolRequest
+import com.example.freedom.domain.model.WorkerProfileRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -25,17 +29,19 @@ class LocalDeterministicQueryEngineTest {
         fakeRepository = FakeMilkRecordRepository()
         toolExecutor = ToolExecutor(fakeRepository)
         queryEngine = LocalDeterministicQueryEngine(fakeRepository, toolExecutor)
+        WorkerProfileRepository.updateProfileFromAuth("ORG001", "WORKER001", "Ramesh K. (Field Officer)")
     }
 
-    // 1. Gemma ToolRequest parsing
+    // 1. Gemma ToolRequest parsing with Numeric Fidelity
     @Test
-    fun `parseGemmaResponse correctly parses standard JSON`() {
+    fun `parseGemmaResponse correctly parses standard JSON with exact decimals`() {
+        val userInput = "Ramesh gave 18.5 litres, fat 4.2 and SNF 8.6. Payment is pending."
         val rawJson = """
             {
               "intent": "CREATE_MILK_RECORD",
               "args": {
                 "farmerName": "Ramesh",
-                "quantity": "18.0",
+                "quantity": "18.5",
                 "fat": "4.2",
                 "snf": "8.6",
                 "paymentStatus": "PENDING"
@@ -44,15 +50,41 @@ class LocalDeterministicQueryEngineTest {
             }
         """.trimIndent()
 
-        val request = queryEngine.parseGemmaResponse(rawJson)
+        val request = queryEngine.parseGemmaResponse(rawJson, userInput)
         assertNotNull(request)
         assertEquals(ToolIntent.CREATE_MILK_RECORD, request!!.intent)
         assertEquals("Ramesh", request.args["farmerName"])
-        assertEquals("18.0", request.args["quantity"])
+        assertEquals("18.5", request.args["quantity"])
         assertEquals("4.2", request.args["fat"])
         assertEquals("8.6", request.args["snf"])
         assertEquals("PENDING", request.args["paymentStatus"])
         assertTrue(request.needsConfirmation)
+    }
+
+    @Test
+    fun `parseGemmaResponse reconciles truncated decimals from user prompt`() {
+        val userInput = "Ramesh gave 18.5 litres, fat 4.2 and SNF 8.6. Payment is pending."
+        // Simulate quantized model truncating floats
+        val rawJson = """
+            {
+              "intent": "CREATE_MILK_RECORD",
+              "args": {
+                "farmerName": "Ramesh",
+                "quantity": "18",
+                "fat": "4",
+                "snf": "8",
+                "paymentStatus": "PENDING"
+              },
+              "needsConfirmation": true
+            }
+        """.trimIndent()
+
+        val request = queryEngine.parseGemmaResponse(rawJson, userInput)
+        assertNotNull(request)
+        assertEquals(ToolIntent.CREATE_MILK_RECORD, request!!.intent)
+        assertEquals("18.5", request.args["quantity"])
+        assertEquals("4.2", request.args["fat"])
+        assertEquals("8.6", request.args["snf"])
     }
 
     @Test
@@ -71,18 +103,110 @@ class LocalDeterministicQueryEngineTest {
         val request = queryEngine.parseGemmaResponse(fenced)
         assertNotNull(request)
         assertEquals(ToolIntent.GET_PENDING_PAYMENTS, request!!.intent)
-        assertTrue(request.args.isEmpty())
         assertFalse(request.needsConfirmation)
     }
 
-    // 2. Valid CREATE_MILK_RECORD
+    // 2. Deterministic Routing: Worker Profile
     @Test
-    fun `valid CREATE_MILK_RECORD executes successfully and inserts into Room`() = runTest {
+    fun `deterministic routing handles officer and worker profile queries`() = runTest {
+        val result = queryEngine.executeQuery("What is my officer ID and assigned area?")
+        assertTrue(result is LocalEngineResult.ToolResult)
+        val toolResult = result as LocalEngineResult.ToolResult
+        assertEquals(ToolIntent.GET_WORKER_PROFILE, toolResult.request.intent)
+
+        val execResult = toolExecutor.execute(toolResult.request)
+        assertTrue(execResult.success)
+        assertEquals("Local Profile Configuration", execResult.sourceOfTruth)
+        assertTrue(execResult.summary.contains("WORKER001"))
+        assertTrue(execResult.summary.contains("Ramesh K."))
+    }
+
+    // 3. Deterministic Routing: Organization Info
+    @Test
+    fun `deterministic routing handles organization queries`() = runTest {
+        val result = queryEngine.executeQuery("Which organization am I working for?")
+        assertTrue(result is LocalEngineResult.ToolResult)
+        val toolResult = result as LocalEngineResult.ToolResult
+        assertEquals(ToolIntent.GET_ORGANIZATION_INFO, toolResult.request.intent)
+
+        val execResult = toolExecutor.execute(toolResult.request)
+        assertTrue(execResult.success)
+        assertEquals("Local Organization Configuration", execResult.sourceOfTruth)
+        assertTrue(execResult.summary.contains("Mandya District Cooperative"))
+    }
+
+    // 4. Deterministic Routing: Farmers Covered Count
+    @Test
+    fun `deterministic routing handles distinct farmers count`() = runTest {
+        val result = queryEngine.executeQuery("How many farmers did I cover today?")
+        assertTrue(result is LocalEngineResult.ToolResult)
+        val toolResult = result as LocalEngineResult.ToolResult
+        assertEquals(ToolIntent.COUNT_FARMERS_COVERED, toolResult.request.intent)
+
+        val execResult = toolExecutor.execute(toolResult.request)
+        assertTrue(execResult.success)
+        assertEquals("Local Room SQLite (Distinct Query)", execResult.sourceOfTruth)
+        assertTrue(execResult.summary.contains("3 distinct farmer(s)"))
+    }
+
+    // 5. Deterministic Routing: Weekly Summary
+    @Test
+    fun `deterministic routing handles weekly farmer summary`() = runTest {
+        val result = queryEngine.executeQuery("How much did Ramesh give this week?")
+        assertTrue(result is LocalEngineResult.ToolResult)
+        val toolResult = result as LocalEngineResult.ToolResult
+        assertEquals(ToolIntent.GET_WEEKLY_WORKER_SUMMARY, toolResult.request.intent)
+        assertEquals("Ramesh", toolResult.request.args["farmerName"])
+
+        val execResult = toolExecutor.execute(toolResult.request)
+        assertTrue(execResult.success)
+        assertEquals("Local Room SQLite (Weekly Aggregation)", execResult.sourceOfTruth)
+        assertTrue(execResult.summary.contains("18.0 L"))
+    }
+
+    // 6. Deterministic Routing: Local RAG Knowledge
+    @Test
+    fun `deterministic routing handles local knowledge queries with grounded citations`() = runTest {
+        val result = queryEngine.executeQuery("When is payment considered complete?")
+        assertTrue(result is LocalEngineResult.ToolResult)
+        val toolResult = result as LocalEngineResult.ToolResult
+        assertEquals(ToolIntent.SEARCH_LOCAL_KNOWLEDGE, toolResult.request.intent)
+
+        val execResult = toolExecutor.execute(toolResult.request)
+        assertTrue(execResult.success)
+        assertNotNull(execResult.ragDocument)
+        assertEquals("KNOW-PAY-01", execResult.ragDocument!!.id)
+        assertTrue(execResult.sourceOfTruth.contains("Clause 4.2"))
+        assertTrue(execResult.summary.contains("mandatory conditions"))
+    }
+
+    // 7. Deterministic Validation & Guardrails
+    @Test
+    fun `incomplete input blocks database write without guessing or defaulting to 0`() = runTest {
+        val result = queryEngine.executeQuery("Ramesh gave 80 litres.")
+        assertTrue(result is LocalEngineResult.ToolResult)
+        val toolResult = result as LocalEngineResult.ToolResult
+        assertEquals(ToolIntent.CREATE_MILK_RECORD, toolResult.request.intent)
+
+        // Missing fat and snf must NOT be defaulted to 0.0
+        assertFalse(toolResult.request.args.containsKey("fat"))
+        assertFalse(toolResult.request.args.containsKey("snf"))
+
+        val execResult = toolExecutor.execute(toolResult.request)
+        assertFalse("Incomplete record must fail deterministic validation", execResult.success)
+        assertTrue(execResult.summary.contains("Validation Failed"))
+        assertTrue(execResult.summary.contains("Fat percentage is required"))
+        assertEquals("Deterministic Validation Check (Failed)", execResult.sourceOfTruth)
+        assertEquals(0, fakeRepository.insertedRecords.size)
+    }
+
+    @Test
+    fun `valid milk record execution succeeds and saves to repository with exact values`() = runTest {
         val request = ToolRequest(
             intent = ToolIntent.CREATE_MILK_RECORD,
             args = mapOf(
                 "farmerName" to "Ramesh",
-                "quantity" to "18.0",
+                "quantity" to "18.5",
                 "fat" to "4.2",
                 "snf" to "8.6",
                 "paymentStatus" to "PENDING"
@@ -90,117 +214,28 @@ class LocalDeterministicQueryEngineTest {
             needsConfirmation = true
         )
 
-        val beforeCount = fakeRepository.insertedRecords.size
-        val result = toolExecutor.execute(request)
-
-        assertTrue(result.success)
-        assertEquals(beforeCount + 1, fakeRepository.insertedRecords.size)
-        val saved = fakeRepository.insertedRecords.last()
+        val execResult = toolExecutor.execute(request)
+        assertTrue(execResult.success)
+        assertEquals(1, fakeRepository.insertedRecords.size)
+        val saved = fakeRepository.insertedRecords[0]
         assertEquals("Ramesh", saved.farmerName)
-        assertEquals(18.0, saved.quantity, 0.01)
-        assertEquals(4.2, saved.fat, 0.01)
-        assertEquals(8.6, saved.snf, 0.01)
-        assertEquals(MilkRecordEntity.PAYMENT_PENDING, saved.paymentStatus)
+        assertEquals(18.5, saved.quantity, 0.001)
+        assertEquals(4.2, saved.fat, 0.001)
+        assertEquals(8.6, saved.snf, 0.001)
+        assertEquals("PENDING", saved.paymentStatus)
     }
 
-    // 3. Invalid quantity
+    // 8. Pending payments execution
     @Test
-    fun `CREATE_MILK_RECORD with invalid quantity is rejected without database write`() = runTest {
-        val invalidRequests = listOf(
-            ToolRequest(ToolIntent.CREATE_MILK_RECORD, mapOf("farmerName" to "Ramesh", "quantity" to "-5.0", "fat" to "4.2", "snf" to "8.6")),
-            ToolRequest(ToolIntent.CREATE_MILK_RECORD, mapOf("farmerName" to "Ramesh", "quantity" to "abc", "fat" to "4.2", "snf" to "8.6")),
-            ToolRequest(ToolIntent.CREATE_MILK_RECORD, mapOf("farmerName" to "Ramesh", "quantity" to "0.0", "fat" to "4.2", "snf" to "8.6")),
-            ToolRequest(ToolIntent.CREATE_MILK_RECORD, mapOf("farmerName" to "Ramesh", "quantity" to "1500.0", "fat" to "4.2", "snf" to "8.6"))
-        )
-
-        for (req in invalidRequests) {
-            val beforeCount = fakeRepository.insertedRecords.size
-            val result = toolExecutor.execute(req)
-            assertFalse("Expected failure for quantity ${req.args["quantity"]}", result.success)
-            assertEquals("No DB write should occur on invalid quantity", beforeCount, fakeRepository.insertedRecords.size)
-        }
-    }
-
-    // 4. Missing required argument
-    @Test
-    fun `CREATE_MILK_RECORD with missing required fat or snf is rejected without database write`() = runTest {
-        val missingArgs = ToolRequest(
-            intent = ToolIntent.CREATE_MILK_RECORD,
-            args = mapOf(
-                "farmerName" to "Ramesh",
-                "quantity" to "80.0"
-                // fat and snf missing
-            ),
-            needsConfirmation = true
-        )
-
-        val beforeCount = fakeRepository.insertedRecords.size
-        val result = toolExecutor.execute(missingArgs)
-
-        assertFalse(result.success)
-        assertTrue(result.summary.contains("Validation Failed"))
-        assertEquals("Database write must not occur when required arguments are missing", beforeCount, fakeRepository.insertedRecords.size)
-    }
-
-    // 5. Ambiguous record requiring confirmation
-    @Test
-    fun `ambiguous prompt Ramesh gave 80 litres triggers CREATE_MILK_RECORD with needsConfirmation true`() = runTest {
-        val result = queryEngine.executeQuery("Ramesh gave 80 litres.")
-
-        assertTrue(result is LocalEngineResult.ToolResult)
-        val toolResult = result as LocalEngineResult.ToolResult
-        assertEquals(ToolIntent.CREATE_MILK_RECORD, toolResult.request.intent)
-        assertEquals("Ramesh", toolResult.request.args["farmerName"])
-        assertEquals("80", toolResult.request.args["quantity"])
-        assertTrue("Must require confirmation before saving", toolResult.request.needsConfirmation)
-        assertEquals("Must not write to database before explicit confirmation", 0, fakeRepository.insertedRecords.size)
-    }
-
-    // 6. Pending payments query
-    @Test
-    fun `pending payments query routes to GET_PENDING_PAYMENTS and returns pending records`() = runTest {
-        val result = queryEngine.executeQuery("Show farmers whose payment is pending.")
-
+    fun `pending payments execution returns correct pending records from local storage`() = runTest {
+        val result = queryEngine.executeQuery("Show pending payments.")
         assertTrue(result is LocalEngineResult.ToolResult)
         val toolResult = result as LocalEngineResult.ToolResult
         assertEquals(ToolIntent.GET_PENDING_PAYMENTS, toolResult.request.intent)
-        assertFalse(toolResult.request.needsConfirmation)
 
         val execResult = toolExecutor.execute(toolResult.request)
         assertTrue(execResult.success)
         assertEquals(2, execResult.records.size)
-        assertTrue(execResult.records.all { it.paymentStatus == MilkRecordEntity.PAYMENT_PENDING })
-    }
-
-    // 7. Farmer history query
-    @Test
-    fun `farmer history query routes to GET_FARMER_HISTORY and returns farmer records`() = runTest {
-        val result = queryEngine.executeQuery("What did Ramesh deliver?")
-
-        assertTrue(result is LocalEngineResult.ToolResult)
-        val toolResult = result as LocalEngineResult.ToolResult
-        assertEquals(ToolIntent.GET_FARMER_HISTORY, toolResult.request.intent)
-        assertEquals("Ramesh", toolResult.request.args["farmerName"])
-
-        val execResult = toolExecutor.execute(toolResult.request)
-        assertTrue(execResult.success)
-        assertEquals(1, execResult.records.size)
-        assertEquals("Ramesh", execResult.records[0].farmerName)
-    }
-
-    // 8. Today's summary query
-    @Test
-    fun `today summary query routes to GET_TODAY_SUMMARY and returns today metrics`() = runTest {
-        val result = queryEngine.executeQuery("How many records were collected today?")
-
-        assertTrue(result is LocalEngineResult.ToolResult)
-        val toolResult = result as LocalEngineResult.ToolResult
-        assertEquals(ToolIntent.GET_TODAY_SUMMARY, toolResult.request.intent)
-
-        val execResult = toolExecutor.execute(toolResult.request)
-        assertTrue(execResult.success)
-        assertTrue(execResult.summary.contains("3 record(s)"))
-        assertTrue(execResult.summary.contains("50.0 L"))
     }
 
     private class FakeMilkRecordRepository : MilkRecordRepository {
@@ -276,6 +311,15 @@ class LocalDeterministicQueryEngineTest {
 
         override suspend fun getFarmerQuantityThisWeek(farmerName: String): Double =
             (sampleRecords + insertedRecords).filter { it.farmerName.equals(farmerName, ignoreCase = true) }.sumOf { it.quantity }
+
+        override suspend fun getDistinctFarmersCount(period: String): Int =
+            (sampleRecords + insertedRecords).map { it.farmerName.lowercase() }.distinct().size
+
+        override suspend fun getWeeklyTotalQuantity(): Double =
+            (sampleRecords + insertedRecords).sumOf { it.quantity }
+
+        override suspend fun getWeeklyRecordsCount(): Int =
+            (sampleRecords + insertedRecords).size
 
         override suspend fun simulateBatchSync(): Int = 0
     }

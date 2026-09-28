@@ -37,6 +37,7 @@ class AuthRepository {
         ) {
             val user = AuthUser(organizationId = DEMO_ORG_ID, workerId = DEMO_WORKER_ID, workerName = "Ramesh K. (Field Officer)")
             _currentUser.value = user
+            com.example.freedom.domain.model.WorkerProfileRepository.updateProfileFromAuth(DEMO_ORG_ID, DEMO_WORKER_ID, user.workerName)
             return Result.success(user)
         }
 
@@ -44,6 +45,7 @@ class AuthRepository {
         if (trimmedOrg.length >= 3 && trimmedWorker.length >= 3 && trimmedPassword.isNotEmpty()) {
             val user = AuthUser(organizationId = trimmedOrg, workerId = trimmedWorker, workerName = "Officer ($trimmedWorker)")
             _currentUser.value = user
+            com.example.freedom.domain.model.WorkerProfileRepository.updateProfileFromAuth(trimmedOrg, trimmedWorker, user.workerName)
             return Result.success(user)
         }
 

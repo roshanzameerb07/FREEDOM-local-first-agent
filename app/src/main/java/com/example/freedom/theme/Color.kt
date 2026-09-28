@@ -17,6 +17,8 @@ val TextPrimary = Color(0xFF1A1C1E)
 val TextSecondary = Color(0xFF43474E)
 val TextTertiary = Color(0xFF74777F)
 val OutlineColor = Color(0xFFDDE3DC)
+val Gray100 = Color(0xFFF1F5F9)
+
 
 // Status & Accent Colors
 val OfflineGreen = Color(0xFF2E7D32)

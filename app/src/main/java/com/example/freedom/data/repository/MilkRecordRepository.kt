@@ -19,5 +19,9 @@ interface MilkRecordRepository {
     suspend fun getRecordsByFarmerName(farmerName: String): List<MilkRecordEntity>
     suspend fun getPendingPaymentRecords(): List<MilkRecordEntity>
     suspend fun getFarmerQuantityThisWeek(farmerName: String): Double
+    suspend fun getDistinctFarmersCount(period: String = "today"): Int
+    suspend fun getWeeklyTotalQuantity(): Double
+    suspend fun getWeeklyRecordsCount(): Int
     suspend fun simulateBatchSync(): Int
 }
+
