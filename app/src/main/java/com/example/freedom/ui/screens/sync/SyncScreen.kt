@@ -185,9 +185,9 @@ fun SyncScreen(
 
                     SyncArchitectureStep(number = "1", title = "Local SQLite", description = "Source of truth stored on device")
                     Spacer(modifier = Modifier.height(6.dp))
-                    SyncArchitectureStep(number = "2", title = "Controlled Batching", description = "Bundles encrypted when connectivity permits")
+                    SyncArchitectureStep(number = "2", title = "Demo Batch Packaging", description = "Bundles prepared when connectivity permits (Simulation)")
                     Spacer(modifier = Modifier.height(6.dp))
-                    SyncArchitectureStep(number = "3", title = "Server Acknowledgement", description = "Records transitioned to UPLOADED status")
+                    SyncArchitectureStep(number = "3", title = "Status Transition", description = "Local records transitioned to UPLOADED status (Simulation)")
                 }
             }
 

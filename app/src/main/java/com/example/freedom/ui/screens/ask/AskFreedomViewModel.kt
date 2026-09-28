@@ -55,9 +55,6 @@ class AskFreedomViewModel(
                 is com.example.freedom.domain.ai.LocalEngineResult.SummaryResult -> {
                     _uiState.update { it.copy(isLoading = false, lastResult = result.summary) }
                 }
-                else -> {
-                    _uiState.update { it.copy(isLoading = false) }
-                }
             }
         }
     }

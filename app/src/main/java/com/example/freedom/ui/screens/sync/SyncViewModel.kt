@@ -47,23 +47,23 @@ class SyncViewModel(
 
     /**
      * Executes local batch sync simulation.
-     * Explicitly labeled as simulation — does NOT claim remote cloud server contact.
+     * Explicitly labeled as simulation — does NOT claim remote cloud server contact or cryptographic operations.
      */
     fun triggerSimulatedBatchSync() {
         viewModelScope.launch {
             _isSyncing.value = true
-            _syncMessage.value = "Packaging local records into encrypted batch bundle..."
-            delay(1200)
-
-            _syncMessage.value = "Validating cryptographic integrity & local signatures..."
+            _syncMessage.value = "Demo batch packaging: preparing local records for bundle..."
             delay(1000)
+
+            _syncMessage.value = "Processing local batch simulation (No remote server contacted)..."
+            delay(800)
 
             val updatedCount = repository.simulateBatchSync()
 
             _syncMessage.value = if (updatedCount > 0) {
-                "Simulation Complete: $updatedCount pending record(s) marked as 'UPLOADED' locally. (Note: No remote cloud server was contacted in this demo)."
+                "Simulation complete: $updatedCount pending record(s) transitioned to 'UPLOADED' status locally. (No remote server contacted)."
             } else {
-                "Simulation: All records are already up to date locally. (0 pending records)."
+                "Simulation complete: All records are already up to date locally (0 pending records). (No remote server contacted)."
             }
             _isSyncing.value = false
         }

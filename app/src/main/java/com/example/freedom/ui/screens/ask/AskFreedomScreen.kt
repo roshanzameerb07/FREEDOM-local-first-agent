@@ -24,16 +24,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.freedom.theme.*
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.Text
-import androidx.compose.material3.Surface
-import androidx.compose.runtime.remember
-
-import androidx.compose.ui.text.style.TextAlign
+import com.example.freedom.ui.screens.records.RecordCardItem
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -103,7 +98,7 @@ fun AskFreedomScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Future Local AI Architecture Conduit",
+                            text = "Local On-Device AI Pipeline",
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Bold,
                             color = OnPrimaryContainer
@@ -111,7 +106,7 @@ fun AskFreedomScreen(
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Phase 1: Deterministic Local SQLite Query Resolver.\nPhase 2: On-device SLM (Gemma/MediaPipe) converts natural language into structured local database tool queries.",
+                        text = "Input → Real Gemma 3 1B → Structured ToolRequest → Deterministic Validation → Room SQLite.\n100% Offline, Private, and Verified.",
                         style = MaterialTheme.typography.bodySmall,
                         color = OnPrimaryContainer.copy(alpha = 0.85f),
                         lineHeight = 16.sp
@@ -176,185 +171,249 @@ fun AskFreedomScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 ExampleQueryChip(
-                    text = "Show farmers whose payment is pending.",
+                    text = "Ramesh gave 18 litres, fat 4.2 and SNF 8.6. Payment is pending.",
                     onClick = {
                         focusManager.clearFocus()
-                        viewModel.submitQuery("Show farmers whose payment is pending.")
+                        viewModel.submitQuery("Ramesh gave 18 litres, fat 4.2 and SNF 8.6. Payment is pending.")
                     }
                 )
                 ExampleQueryChip(
-                    text = "How much did Ramesh give this week?",
+                    text = "Show pending payments.",
                     onClick = {
                         focusManager.clearFocus()
-                        viewModel.submitQuery("How much did Ramesh give this week?")
+                        viewModel.submitQuery("Show pending payments.")
                     }
                 )
                 ExampleQueryChip(
-                    text = "How many records were collected today?",
+                    text = "What did Ramesh deliver?",
                     onClick = {
                         focusManager.clearFocus()
-                        viewModel.submitQuery("How many records were collected today?")
+                        viewModel.submitQuery("What did Ramesh deliver?")
+                    }
+                )
+                ExampleQueryChip(
+                    text = "Ramesh gave 80 litres.",
+                    onClick = {
+                        focusManager.clearFocus()
+                        viewModel.submitQuery("Ramesh gave 80 litres.")
                     }
                 )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.TextButton
-import androidx.compose.ui.text.style.TextAlign
-
-    // Inside AskFreedomScreen composable, after existing UI state retrieval
-    // Add dialog handling
-    uiState.confirmationRequest?.let { request ->
-        AlertDialog(
-            onDismissRequest = { viewModel.cancelToolExecution() },
-            title = { Text(text = "Confirm \${request.intent.name}") },
-            text = {
-                Column {
-                    Text(text = "Arguments:")
-                    request.args.forEach { (key, value) ->
-                        Text(text = "- $key: $value")
-                    }
-                    if (request.needsConfirmation) {
-                        Text(text = "\nMissing or ambiguous values may require confirmation.")
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { viewModel.confirmToolExecution() }) {
-                    Text("Confirm")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { viewModel.cancelToolExecution() }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
-
-    // Execution result UI
-    uiState.executionResult?.let { execResult ->
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = CardBackground),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-        ) {
-            Column(modifier = Modifier.padding(14.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Tool Execution Result",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = PrimaryGreenDark
-                    )
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = execResult.summary,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = TextPrimary
-                )
-                if (execResult.records.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = "Records (${execResult.records.size}):",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = TextSecondary
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        items(execResult.records, key = { it.id }) { record ->
-                            RecordCardItem(record = record)
+            // Confirmation Dialog for Tool Requests
+            uiState.confirmationRequest?.let { request ->
+                AlertDialog(
+                    onDismissRequest = { viewModel.cancelToolExecution() },
+                    title = {
+                        Text(
+                            text = "Confirm Tool Action",
+                            fontWeight = FontWeight.Bold,
+                            color = PrimaryGreenDark
+                        )
+                    },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                text = "Action: ${request.intent.name}",
+                                fontWeight = FontWeight.SemiBold,
+                                color = TextPrimary
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(text = "Extracted Arguments:", fontWeight = FontWeight.Medium, color = TextSecondary)
+                            if (request.args.isEmpty()) {
+                                Text(text = "  (None)", style = MaterialTheme.typography.bodySmall, color = TextTertiary)
+                            } else {
+                                request.args.forEach { (key, value) ->
+                                    val displayVal = if (value.isBlank()) "MISSING (Required)" else value
+                                    Text(
+                                        text = "• $key: $displayVal",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = if (value.isBlank()) Color.Red else TextPrimary
+                                    )
+                                }
+                            }
+                            if (request.intent.name == "CREATE_MILK_RECORD") {
+                                val hasMissing = request.args["fat"].isNullOrBlank() || request.args["snf"].isNullOrBlank() || request.args["quantity"].isNullOrBlank()
+                                if (hasMissing) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = "Warning: Some required fields are missing. Validation will reject incomplete entries to prevent data corruption.",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color(0xFFC62828),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = { viewModel.confirmToolExecution() },
+                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryGreen)
+                        ) {
+                            Text("Confirm & Execute")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { viewModel.cancelToolExecution() }) {
+                            Text("Cancel", color = TextSecondary)
                         }
                     }
-                }
+                )
             }
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-    }
 
-    // Existing summary result handling (when lastResult not null)
-    if (!uiState.isLoading && uiState.lastResult != null) {
-        val result = uiState.lastResult!!
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = CardBackground),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-        ) {
-            Column(modifier = Modifier.padding(14.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+            // Loading state
+            if (uiState.isLoading) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "Query Response",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = PrimaryGreenDark
-                    )
-                    Surface(
-                        color = OfflineGreenBg,
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(color = PrimaryGreen)
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "100% Offline",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = OfflineGreen,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            text = "Running local on-device inference...",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = result.summary,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = TextPrimary
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = result.executionPipelineDescription,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextTertiary,
-                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
-                )
-                if (result.records.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = "Matching Local Records (${result.records.size}):",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = TextSecondary
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        items(result.records, key = { it.id }) { record ->
-                            RecordCardItem(record = record)
+            }
+
+            // Tool Execution Result UI
+            uiState.executionResult?.let { execResult ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = CardBackground),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Tool Execution Result",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (execResult.success) PrimaryGreenDark else Color(0xFFC62828)
+                            )
+                            Surface(
+                                color = if (execResult.success) OfflineGreenBg else Color(0xFFFFEBEE),
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Text(
+                                    text = if (execResult.success) "Executed Locally" else "Validation Blocked",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (execResult.success) OfflineGreen else Color(0xFFC62828),
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = execResult.summary,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = TextPrimary
+                        )
+                        if (execResult.records.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = "Records (${execResult.records.size}):",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = TextSecondary
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            LazyColumn(
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth().heightIn(max = 240.dp)
+                            ) {
+                                items(execResult.records, key = { it.id }) { record ->
+                                    RecordCardItem(record = record)
+                                }
+                            }
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            // Summary result handling
+            if (!uiState.isLoading && uiState.lastResult != null) {
+                val result = uiState.lastResult!!
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = CardBackground),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Query Response",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = PrimaryGreenDark
+                            )
+                            Surface(
+                                color = OfflineGreenBg,
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Text(
+                                    text = "100% Offline",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = OfflineGreen,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = result.summary,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = TextPrimary
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = result.executionPipelineDescription,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextTertiary,
+                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                        )
+                        if (result.records.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = "Matching Local Records (${result.records.size}):",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = TextSecondary
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            LazyColumn(
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth().heightIn(max = 240.dp)
+                            ) {
+                                items(result.records, key = { it.id }) { record ->
+                                    RecordCardItem(record = record)
+                                }
+                            }
                         }
                     }
                 }
             }
-        }
-    }
-
         }
     }
 }

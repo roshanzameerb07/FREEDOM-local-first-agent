@@ -1,29 +1,20 @@
-# Android / Gradle
-.gradle/
-build/
-**/build/
-
-# Android Studio
-.idea/
 *.iml
-
-# Local machine configuration
+.gradle
+/local.properties
+.idea/
+*/.idea/
+.DS_Store
+/build
+*/build
+captures/
+.externalNativeBuild
+.cxx
 local.properties
-**/local.properties
-
-# Native build
-.externalNativeBuild/
-.cxx/
-
-# Generated APKs / bundles
 *.apk
 *.aab
+*.jks
+*.keystore
 
-# Local model artifacts — download separately
+# Crucial: Exclude the large 584MB Gemma model artifact from git tracking
+app/src/main/assets/gemma3-1b-it-int4.litertlm
 *.litertlm
-*.task
-*.tflite
-
-# OS files
-.DS_Store
-Thumbs.db
