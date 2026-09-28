@@ -6,7 +6,7 @@ FREEDOM is an offline-first Android AI agent designed for field workflows on ord
 
 ## Current prototype
 
-The current proof-of-concept demonstrates a milk-collection workflow:
+The proof-of-concept demonstrates a milk-collection workflow:
 
 - local authentication
 - local Room/SQLite storage
@@ -21,28 +21,29 @@ Milk collection is the demonstration workflow; the underlying agent architecture
 
 ## Architecture
 
-User input → on-device Gemma → structured ToolRequest → validation → local tool execution → Room/SQLite → response
+**User input → on-device Gemma → structured ToolRequest → validation → local tool execution → Room/SQLite → response**
 
 Critical data writes and validation are handled by deterministic Kotlin code rather than allowing the model to write directly to the database.
 
 ## Model
 
-The Android prototype uses the LiteRT-LM artifact:
+The Android prototype uses:
 
 `gemma3-1b-it-int4.litertlm`
 
 The model is intentionally **not committed to this Git repository** because it is about 584 MB.
 
 Official model repository:
+
 https://huggingface.co/litert-community/Gemma3-1B-IT
 
-The repository is gated by the Gemma license; accept the license and download the exact `gemma3-1b-it-int4.litertlm` artifact. citeturn664943search0turn664943search2
+The model repository requires accepting the applicable Gemma license before downloading the artifact.
 
-Place it at:
+Place the downloaded artifact at:
 
 `app/src/main/assets/gemma3-1b-it-int4.litertlm`
 
-The current tested artifact SHA-256 is:
+Expected SHA-256:
 
 `1325ae366d31950f137c9c357b9fa89448b176d76998180c08ceaca78bba98be`
 
@@ -70,14 +71,14 @@ The core workflow does not require continuous internet connectivity. Synchroniza
 
 ## Project status
 
-Phase 1: native Android foundation and offline workflow — complete.
+**Phase 1:** native Android foundation and offline workflow — complete.
 
-Phase 2: real on-device Gemma inference and agentic tool flow — implemented in the current source tree.
+**Phase 2:** real on-device Gemma inference and agentic tool flow — implemented in the current source tree.
 
 Next validation target: physical end-to-end testing of record creation, pending-payment queries, farmer-history queries, ambiguity confirmation, and airplane-mode operation.
 
-## License / attribution
+## Model handling
 
-Project code: FREEDOM prototype.
+The model file is deliberately excluded from Git. A new developer/laptop must download the exact artifact separately and place it in the path above.
 
-The Gemma model remains subject to its own Gemma license and is not redistributed by this repository.
+The Gemma model remains subject to its own license and is not redistributed by this repository.
