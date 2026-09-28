@@ -1,0 +1,29 @@
+# Android / Gradle
+.gradle/
+build/
+**/build/
+
+# Android Studio
+.idea/
+*.iml
+
+# Local machine configuration
+local.properties
+**/local.properties
+
+# Native build
+.externalNativeBuild/
+.cxx/
+
+# Generated APKs / bundles
+*.apk
+*.aab
+
+# Local model artifacts — download separately
+*.litertlm
+*.task
+*.tflite
+
+# OS files
+.DS_Store
+Thumbs.db
