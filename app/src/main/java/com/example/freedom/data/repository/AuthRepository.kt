@@ -38,6 +38,7 @@ class AuthRepository {
             val user = AuthUser(organizationId = DEMO_ORG_ID, workerId = DEMO_WORKER_ID, workerName = "Ramesh K. (Field Officer)")
             _currentUser.value = user
             com.example.freedom.domain.model.WorkerProfileRepository.updateProfileFromAuth(DEMO_ORG_ID, DEMO_WORKER_ID, user.workerName)
+            com.example.freedom.framework.FreedomFramework.onUserAuthenticated(DEMO_ORG_ID, DEMO_WORKER_ID, user.workerName)
             return Result.success(user)
         }
 
@@ -46,6 +47,7 @@ class AuthRepository {
             val user = AuthUser(organizationId = trimmedOrg, workerId = trimmedWorker, workerName = "Officer ($trimmedWorker)")
             _currentUser.value = user
             com.example.freedom.domain.model.WorkerProfileRepository.updateProfileFromAuth(trimmedOrg, trimmedWorker, user.workerName)
+            com.example.freedom.framework.FreedomFramework.onUserAuthenticated(trimmedOrg, trimmedWorker, user.workerName)
             return Result.success(user)
         }
 
@@ -54,6 +56,7 @@ class AuthRepository {
 
     fun logout() {
         _currentUser.value = null
+        com.example.freedom.framework.FreedomFramework.onUserLogout()
     }
 
     fun isLoggedIn(): Boolean = _currentUser.value != null

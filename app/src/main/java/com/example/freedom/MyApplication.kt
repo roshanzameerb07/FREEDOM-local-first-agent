@@ -21,6 +21,9 @@ class MyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
+        // Initialize FREEDOM framework (organization profile + model provider registration)
+        com.example.freedom.framework.FreedomFramework.initialize()
+
         val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         val memInfo = ActivityManager.MemoryInfo()
         activityManager.getMemoryInfo(memInfo)

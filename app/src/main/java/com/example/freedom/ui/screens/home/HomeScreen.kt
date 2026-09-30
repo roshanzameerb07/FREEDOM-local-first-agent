@@ -133,7 +133,65 @@ fun HomeScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Framework Organization & Model Status Bar
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = CardBackground,
+                shape = RoundedCornerShape(10.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, OutlineColor)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val activeOrg = com.example.freedom.framework.organization.OrganizationRegistry.getActiveProfileOrNull()
+                    val activeModel = com.example.freedom.framework.model.ModelProviderRegistry.getActiveModelInfo()
+                    val activeSession = com.example.freedom.framework.session.SessionManager.getCurrentSessionOrNull()
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Business,
+                            contentDescription = null,
+                            tint = PrimaryGreen,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = activeOrg?.organizationId ?: "ORG001",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                        val roleText = activeSession?.currentUser?.role?.displayName ?: "Field Worker"
+                        Text(
+                            text = " • $roleText",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextSecondary
+                        )
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Memory,
+                            contentDescription = null,
+                            tint = InfoBlue,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = activeModel?.displayName?.split(" ")?.firstOrNull() ?: "Qwen3",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = InfoBlue
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
 
             // Officer Welcome Header
             uiState.currentUser?.let { user ->

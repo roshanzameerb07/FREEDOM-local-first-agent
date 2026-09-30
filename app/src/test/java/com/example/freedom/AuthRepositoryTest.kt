@@ -14,6 +14,11 @@ class AuthRepositoryTest {
         authRepository = AuthRepository()
     }
 
+    @org.junit.After
+    fun tearDown() {
+        authRepository.logout()
+    }
+
     @Test
     fun `login with fixed demo credentials succeeds`() {
         val result = authRepository.login("ORG001", "WORKER001", "1234")

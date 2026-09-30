@@ -73,7 +73,22 @@ object QwenQueryParser {
     }
 
     suspend fun parse(userPrompt: String, knownFarmers: List<FarmerEntity> = emptyList()): FreedomQuery {
-        if (AIEngineProvider.isAvailable()) {
+        val activeModel = com.example.freedom.framework.model.ModelProviderRegistry.getActiveProvider()
+        if (activeModel != null && activeModel.isAvailable()) {
+            try {
+                val fullPrompt = "${buildSystemPrompt()}\n\nUser Question: \"$userPrompt\"\nJSON Output:"
+                val rawResponse = activeModel.generateText(fullPrompt)
+                if (!rawResponse.isNullOrBlank()) {
+                    val parsed = parseJsonResponse(rawResponse, userPrompt)
+                    if (parsed != null) {
+                        Log.i(TAG, "${activeModel.displayName} parsed query successfully")
+                        return parsed
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "${activeModel.displayName} parsing error: ${e.message}", e)
+            }
+        } else if (AIEngineProvider.isAvailable()) {
             try {
                 val fullPrompt = "${buildSystemPrompt()}\n\nUser Question: \"$userPrompt\"\nJSON Output:"
                 val rawResponse = AIEngineProvider.generateText(fullPrompt)
