@@ -42,6 +42,37 @@ object MilkCollectionProfile {
         region = "Mandya, Karnataka"
     )
 
+    /** Dedicated Hackathon Demo Organization ID */
+    const val HACKATHON_DEMO_ORG_ID = "FREEDOM-DEMO-001"
+
+    /**
+     * Creates the dedicated hackathon demo organization profile.
+     */
+    fun createHackathonDemoProfile(): OrganizationProfile = OrganizationProfile(
+        organizationId = HACKATHON_DEMO_ORG_ID,
+        organizationName = "FREEDOM Demo Organization",
+        domain = "milk_collection",
+        organizationType = OrganizationType.DEMO,
+        enabledEntities = setOf(
+            "FARMER",
+            "MILK_RECORD"
+        ),
+        enabledFields = setOf(
+            "QUANTITY",
+            "FAT",
+            "SNF",
+            "PAYMENT_STATUS",
+            "PAYMENT_METHOD",
+            "PAYMENT_REFERENCE",
+            "PAYABLE_AMOUNT",
+            "AMOUNT_PAID"
+        ),
+        enabledQueryCapabilities = QueryCapability.DEFAULT_CAPABILITIES,
+        activeModelProvider = ModelProviderType.FREEDOM_PROVIDED,
+        registrationNumber = "DEMO-HACKATHON-2026",
+        region = "Mandya Demonstration Route"
+    )
+
     /**
      * Creates a default demo activation state.
      */

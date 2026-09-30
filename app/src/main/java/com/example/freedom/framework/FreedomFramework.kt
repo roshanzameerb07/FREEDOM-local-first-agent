@@ -34,10 +34,13 @@ object FreedomFramework {
     fun initialize() {
         if (isInitialized) return
 
-        // 1. Register the milk collection reference profile
+        // 1. Register organization profiles
         val defaultProfile = MilkCollectionProfile.createDefault()
         OrganizationRegistry.register(defaultProfile)
         OrganizationRegistry.setActiveProfile(defaultProfile.organizationId)
+
+        val demoProfile = MilkCollectionProfile.createHackathonDemoProfile()
+        OrganizationRegistry.register(demoProfile)
 
         // 2. Register the FREEDOM-provided model provider
         val qwenProvider = QwenModelProvider()
@@ -56,6 +59,9 @@ object FreedomFramework {
         displayName: String,
         role: UserRole = UserRole.FIELD_WORKER
     ) {
+        if (OrganizationRegistry.getProfile(organizationId) != null) {
+            OrganizationRegistry.setActiveProfile(organizationId)
+        }
         SessionManager.createSession(
             organizationId = organizationId,
             userId = userId,

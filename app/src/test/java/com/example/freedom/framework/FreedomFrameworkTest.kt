@@ -514,6 +514,44 @@ class FreedomFrameworkTest {
     }
 
     // ═══════════════════════════════════════════════════════════════
+    // Hackathon Demo Tests
+    // ═══════════════════════════════════════════════════════════════
+
+    @Test
+    fun `hackathon demo organization is registered upon framework initialization`() {
+        FreedomFramework.initialize()
+        val demoProfile = OrganizationRegistry.getProfile(MilkCollectionProfile.HACKATHON_DEMO_ORG_ID)
+        assertNotNull(demoProfile)
+        assertEquals("FREEDOM-DEMO-001", demoProfile!!.organizationId)
+        assertEquals("FREEDOM Demo Organization", demoProfile.organizationName)
+        assertEquals(OrganizationType.DEMO, demoProfile.organizationType)
+        assertTrue(demoProfile.enabledEntities.contains("FARMER"))
+        assertTrue(demoProfile.enabledEntities.contains("MILK_RECORD"))
+    }
+
+    @Test
+    fun `hackathon demo login activates demo profile and establishes FIELD_WORKER session`() {
+        FreedomFramework.initialize()
+        FreedomFramework.onUserAuthenticated(
+            organizationId = "FREEDOM-DEMO-001",
+            userId = "DEMO-FIELD-01",
+            displayName = "Demo Field Officer",
+            role = UserRole.FIELD_WORKER
+        )
+
+        val session = SessionManager.getCurrentSession()
+        assertEquals("FREEDOM-DEMO-001", session.organizationId)
+        assertEquals("DEMO-FIELD-01", session.currentUser?.userId)
+        assertEquals(UserRole.FIELD_WORKER, session.currentUser?.role)
+        assertEquals("FREEDOM-DEMO-001", OrganizationRegistry.getActiveProfile().organizationId)
+
+        // Verify authorization for standard queries
+        val readQuery = FreedomQuery(requestType = RequestType.QUERY, target = QueryTarget.MILK_RECORDS)
+        val authResult = AuthorizationPolicy.authorize(readQuery, session)
+        assertTrue("FIELD_WORKER must be authorized to read records", authResult.isAuthorized)
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     // Helpers
     // ═══════════════════════════════════════════════════════════════
 

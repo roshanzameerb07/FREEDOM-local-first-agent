@@ -184,9 +184,10 @@ class FreedomQueryExecutor(
         val activeSession = com.example.freedom.framework.session.SessionManager.getCurrentSessionOrNull()
         val sessionOrgId = activeSession?.organizationId ?: sessionProfile.organizationId
         val sessionWorkerId = activeSession?.currentUser?.userId ?: sessionProfile.workerId
+        val isDemoSession = sessionOrgId == "FREEDOM-DEMO-001" || sessionOrgId == "ORG001"
         val allRecords = repository.getAllRecords().first().filter {
-            (it.orgId.isBlank() || it.orgId == sessionOrgId) &&
-            (it.workerId.isBlank() || it.workerId == sessionWorkerId)
+            (it.orgId.isBlank() || it.orgId == sessionOrgId || (isDemoSession && it.orgId in listOf("ORG001", "FREEDOM-DEMO-001"))) &&
+            (it.workerId.isBlank() || it.workerId == sessionWorkerId || (isDemoSession && it.workerId in listOf("WORKER001", "DEMO-FIELD-01", sessionWorkerId)))
         }
 
         // 4. Apply farmer identity filter
