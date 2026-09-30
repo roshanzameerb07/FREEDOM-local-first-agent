@@ -10,59 +10,99 @@ import com.google.ai.edge.litertlm.Backend
 import java.io.File
 import java.io.FileOutputStream
 
+/**
+ * Application entry point for FREEDOM.
+ * Initializes Qwen3 1.7B INT4 on-device LLM via LiteRT-LM.
+ */
 class MyApplication : Application() {
+
     private var engine: Engine? = null
 
     override fun onCreate() {
         super.onCreate()
-        // Verify device memory (minimum 5000 MiB available to OS for a 6 GB device)
+
         val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         val memInfo = ActivityManager.MemoryInfo()
         activityManager.getMemoryInfo(memInfo)
         val totalRam = memInfo.totalMem
-        val minRam = 5000L * 1024 * 1024 // 5000 MiB threshold for 6 GB physical RAM devices
+        val minRam = 4000L * 1024 * 1024 // 4000 MiB minimum threshold for Qwen3-1.7B INT4
+
+        Log.i("MyApplication", "Device RAM: ${totalRam / (1024 * 1024)} MiB")
+
         if (totalRam < minRam) {
-            Log.w("MyApplication", "Insufficient RAM (${totalRam / (1024 * 1024)} MiB) for Gemma-3 1B model; skipping AI initialization.")
+            Log.w("MyApplication", "RAM (${totalRam / (1024 * 1024)} MiB) below recommended minimum for Qwen3 1.7B; skipping AI initialization.")
             return
         }
 
-        // Initialise the Litert-LM engine on a background thread with the model file
+        // Initialize LiteRT-LM engine on background thread
         Thread {
+            val startTime = System.currentTimeMillis()
             try {
-                val modelFile = File(filesDir, "gemma3-1b-it-int4.litertlm")
-                if (!modelFile.exists() || modelFile.length() < 500_000_000L) {
-                    val tmpFile = File("/data/local/tmp/gemma3-1b-it-int4.litertlm")
-                    if (tmpFile.exists() && tmpFile.canRead() && tmpFile.length() >= 500_000_000L) {
-                        Log.i("MyApplication", "Copying Gemma model from /data/local/tmp...")
-                        tmpFile.inputStream().use { input ->
-                            FileOutputStream(modelFile).use { output ->
-                                input.copyTo(output)
-                            }
-                        }
+                // Model file asset resolution
+                var modelFile = File(filesDir, "qwen3-1.7b-int4.litertlm")
+                
+                if (!modelFile.exists() || modelFile.length() < 300_000_000L) {
+                    val fallbackAsset = "Qwen3-1.7B_dynamic_wi4b32_afp32.litertlm"
+                    val primaryAsset = "qwen3-1.7b-int4.litertlm"
+                    
+                    val assetToUse = if (assets.list("")?.contains(primaryAsset) == true) {
+                        primaryAsset
                     } else {
-                        Log.i("MyApplication", "Extracting Gemma model from assets to filesDir...")
-                        assets.open("gemma3-1b-it-int4.litertlm").use { input ->
-                            FileOutputStream(modelFile).use { output ->
-                                input.copyTo(output)
-                            }
+                        fallbackAsset
+                    }
+
+                    Log.i("MyApplication", "Extracting Qwen3 model asset ($assetToUse) to filesDir...")
+                    assets.open(assetToUse).use { input ->
+                        FileOutputStream(modelFile).use { output ->
+                            input.copyTo(output)
                         }
                     }
-                    Log.i("MyApplication", "Model ready at ${modelFile.absolutePath} (${modelFile.length()} bytes)")
+                    Log.i("MyApplication", "Model extracted to ${modelFile.absolutePath} (${modelFile.length()} bytes)")
                 }
 
-                val config = EngineConfig(
-                    modelPath = modelFile.absolutePath,
-                    backend = Backend.CPU()
-                )
-                val engineInstance = Engine(config)
-                engineInstance.initialize()
+                // Attempt GPU acceleration first, fallback to CPU
+                var backendUsed = "GPU"
+                var engineInstance: Engine? = null
+
+                try {
+                    val gpuConfig = EngineConfig(
+                        modelPath = modelFile.absolutePath,
+                        backend = Backend.GPU()
+                    )
+                    engineInstance = Engine(gpuConfig)
+                    engineInstance.initialize()
+                    Log.i("MyApplication", "Qwen3 1.7B initialized successfully with GPU backend.")
+                } catch (gpuException: Throwable) {
+                    Log.w("MyApplication", "GPU backend init failed (${gpuException.message}); attempting CPU fallback...")
+                    backendUsed = "CPU"
+                    val cpuConfig = EngineConfig(
+                        modelPath = modelFile.absolutePath,
+                        backend = Backend.CPU()
+                    )
+                    engineInstance = Engine(cpuConfig)
+                    engineInstance.initialize()
+                    Log.i("MyApplication", "Qwen3 1.7B initialized successfully with CPU backend.")
+                }
+
+                val duration = System.currentTimeMillis() - startTime
                 engine = engineInstance
-                // Expose engine globally for AI modules
-                com.example.freedom.domain.ai.AIEngineProvider.engine = engineInstance
-                Log.i("MyApplication", "Litert-LM engine initialized successfully with Gemma-3 model at ${modelFile.absolutePath}")
+
+                // Expose engine instance & metadata globally
+                com.example.freedom.domain.ai.AIEngineProvider.apply {
+                    engine = engineInstance
+                    modelName = "Qwen3-1.7B INT4"
+                    backendType = backendUsed
+                    initDurationMs = duration
+                }
+
+                Log.i(
+                    "MyApplication",
+                    "LiteRT-LM Engine Ready: Model=Qwen3 1.7B, Backend=$backendUsed, InitTime=${duration}ms"
+                )
+
             } catch (e: Exception) {
-                Log.e("MyApplication", "Litert-LM engine init failed: " + e.message, e)
-                // Graceful fallback – UI can still function without AI
+                Log.e("MyApplication", "LiteRT-LM Qwen3 engine initialization failed: " + e.message, e)
+                com.example.freedom.domain.ai.AIEngineProvider.lastError = e.message
             }
         }.start()
     }

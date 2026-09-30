@@ -1,0 +1,19 @@
+{
+  "evaluation_target": "Qwen/Qwen3-1.7B",
+  "evaluation_type": "zero_shot",
+  "dataset": "dataset/test.jsonl",
+  "dataset_size": 850,
+  "status": "BLOCKED_LOCAL_ENVIRONMENT",
+  "execution_environment": {
+    "os": "Windows 11 AMD64",
+    "python_version": "3.14.5",
+    "cuda_available": false,
+    "pytorch_installed": false,
+    "transformers_installed": false,
+    "reason": "Host Python 3.14 lacks pre-built PyTorch CUDA wheels on Windows. Base model zero-shot inference must be executed on a CUDA GPU host."
+  },
+  "fabrication_policy": "STRICT_INTEGRITY_PRESERVED. Results are NOT simulated or fabricated.",
+  "reproducible_execution_command": "python -m evaluation.base_model_evaluator --dataset dataset/test.jsonl --output reports/base_model_evaluation.json",
+  "reproducible_script": "evaluation/base_model_evaluator.py",
+  "metrics_harness": "evaluation/metrics.py"
+}

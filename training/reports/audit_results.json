@@ -1,0 +1,333 @@
+{
+  "intersections": {
+    "train intersect validation": 0,
+    "train intersect test": 0,
+    "train intersect hard_test": 0,
+    "validation intersect test": 0,
+    "validation intersect hard_test": 0,
+    "test intersect hard_test": 0
+  },
+  "category_counts": {
+    "ambiguous_entity": {
+      "pilot": 11,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "amount_paid": {
+      "pilot": 11,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "and_logic_filter": {
+      "pilot": 11,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "avg_aggregation": {
+      "pilot": 11,
+      "train": 133,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "compositional_query": {
+      "pilot": 10,
+      "train": 0,
+      "validation": 40,
+      "test": 40,
+      "hard_test": 40
+    },
+    "conditional_query": {
+      "pilot": 11,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "conversational_pronoun": {
+      "pilot": 11,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "count_distinct_farmers": {
+      "pilot": 11,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "count_records": {
+      "pilot": 11,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "equality_filter": {
+      "pilot": 11,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "exists_query": {
+      "pilot": 11,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "explicit_date": {
+      "pilot": 11,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "explicit_range": {
+      "pilot": 11,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "group_by": {
+      "pilot": 11,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "having_filter": {
+      "pilot": 11,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "limit_query": {
+      "pilot": 11,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "linguistic_variation": {
+      "pilot": 51,
+      "train": 660,
+      "validation": 90,
+      "test": 90,
+      "hard_test": 90
+    },
+    "max_aggregation": {
+      "pilot": 11,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "min_aggregation": {
+      "pilot": 11,
+      "train": 133,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "missing_field": {
+      "pilot": 11,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "multi_aggregation": {
+      "pilot": 11,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "multi_condition": {
+      "pilot": 10,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "multi_field_lookup": {
+      "pilot": 11,
+      "train": 133,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "not_null_filter": {
+      "pilot": 11,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "numeric_filter": {
+      "pilot": 11,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "or_logic_filter": {
+      "pilot": 11,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "order_by_aggregate": {
+      "pilot": 11,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "order_by_field": {
+      "pilot": 11,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "payment_method": {
+      "pilot": 11,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "payment_reference": {
+      "pilot": 11,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "payment_scope_all": {
+      "pilot": 6,
+      "train": 66,
+      "validation": 9,
+      "test": 9,
+      "hard_test": 9
+    },
+    "payment_scope_any": {
+      "pilot": 5,
+      "train": 66,
+      "validation": 9,
+      "test": 9,
+      "hard_test": 9
+    },
+    "payment_status": {
+      "pilot": 11,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "payment_timestamp": {
+      "pilot": 11,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "read_write_contrast": {
+      "pilot": 11,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "relative_date": {
+      "pilot": 11,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "simple_field_lookup": {
+      "pilot": 11,
+      "train": 133,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "single_farmer_lookup": {
+      "pilot": 11,
+      "train": 133,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "sum_aggregation": {
+      "pilot": 11,
+      "train": 133,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "time_constrained_lookup": {
+      "pilot": 11,
+      "train": 133,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "unknown_entity": {
+      "pilot": 11,
+      "train": 135,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "unsupported_request": {
+      "pilot": 11,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    },
+    "upload_status": {
+      "pilot": 11,
+      "train": 132,
+      "validation": 18,
+      "test": 18,
+      "hard_test": 18
+    }
+  },
+  "composition_counts": {
+    "entity_plus_time": 3259,
+    "payment_plus_time": 429,
+    "aggregation_plus_time": 3305,
+    "filters_plus_aggregation": 227,
+    "and_logic": 372,
+    "or_logic": 186,
+    "group_by": 698,
+    "having": 186,
+    "order_by": 678,
+    "limit": 492,
+    "conditional_queries": 186,
+    "clarification": 747,
+    "unsupported": 186,
+    "read_write_hard_negatives": 186,
+    "multi_primitive_composition": 326
+  },
+  "sample_failures": 0,
+  "max_total_tokens": 268,
+  "pct_under_512": 100.0
+}

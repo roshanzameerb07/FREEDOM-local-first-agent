@@ -1,0 +1,61 @@
+# ═══════════════════════════════════════════════════════════════════════
+# FREEDOM AI — Qwen3 1.7B SFT / QLoRA Training Configuration
+# ═══════════════════════════════════════════════════════════════════════
+# Target Model: Qwen/Qwen3-1.7B
+# Objective: Natural Language → Canonical FreedomQuery JSON
+# Tooling: Hugging Face TRL (SFTTrainer) + PEFT (QLoRA)
+
+model:
+  base_model_name_or_path: "Qwen/Qwen3-1.7B"
+  torch_dtype: "bfloat16"
+  trust_remote_code: true
+  use_auth_token: false
+  load_in_4bit: true             # QLoRA 4-bit NormalFloat (NF4) quantization
+  bnb_4bit_compute_dtype: "bfloat16"
+  bnb_4bit_quant_type: "nf4"
+  bnb_4bit_use_double_quant: true
+
+lora:
+  r: 16                          # Low-rank dimension; sufficient for JSON structural adaptation
+  lora_alpha: 32                 # Scaling factor (alpha = 2 * r)
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+  lora_dropout: 0.05
+  bias: "none"
+  task_type: "CAUSAL_LM"
+
+training_arguments:
+  output_dir: "./output/qwen3-1.7b-freedom-sft"
+  num_train_epochs: 3
+  per_device_train_batch_size: 4
+  per_device_eval_batch_size: 4
+  gradient_accumulation_steps: 4  # Effective batch size = 4 * 4 = 16
+  learning_rate: 0.0002          # Standard AdamW LR for LoRA fine-tuning
+  lr_scheduler_type: "cosine"
+  warmup_ratio: 0.05             # 5% warmup steps to stabilize initial gradient updates
+  weight_decay: 0.01
+  logging_steps: 10
+  evaluation_strategy: "steps"
+  eval_steps: 100
+  save_strategy: "steps"
+  save_steps: 200
+  save_total_limit: 3
+  load_best_model_at_end: true
+  metric_for_best_model: "eval_loss"
+  bf16: true                     # Native bfloat16 for modern Ampere/Ada GPUs
+  gradient_checkpointing: true   # Drastically reduces VRAM usage to fit on single consumer/T4 GPU
+  optim: "paged_adamw_8bit"      # Memory-efficient optimizer
+
+dataset:
+  train_file: "dataset/train.jsonl"
+  validation_file: "dataset/validation.jsonl"
+  test_file: "dataset/test.jsonl"
+  max_seq_length: 512            # Prompts average 10 tokens; target JSONs average 129 tokens; 512 covers 100% without truncation
+  dataset_text_field: "formatted_text"
+  packing: false                 # Prevent cross-example boundary interference

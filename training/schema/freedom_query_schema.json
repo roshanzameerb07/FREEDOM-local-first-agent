@@ -1,0 +1,316 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CanonicalFreedomQuery",
+  "description": "Frozen JSON schema representation for FREEDOM AI Query translation target (Qwen3 1.7B)",
+  "type": "object",
+  "required": [
+    "type",
+    "target",
+    "entity",
+    "entityScope",
+    "select",
+    "filters",
+    "filterLogic",
+    "time",
+    "aggregations",
+    "groupBy",
+    "havingFilter",
+    "orderBy",
+    "limit",
+    "exists",
+    "paymentScope",
+    "conditionalSpec",
+    "writeArgs",
+    "knowledgeQuery",
+    "reason"
+  ],
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": ["QUERY", "WRITE", "CLARIFY", "UNSUPPORTED"]
+    },
+    "target": {
+      "type": "string",
+      "enum": ["MILK_RECORDS", "WORKER_PROFILE", "ORGANIZATION_INFO", "KNOWLEDGE_BASE"]
+    },
+    "entity": {
+      "type": ["string", "null"]
+    },
+    "entityScope": {
+      "type": "string",
+      "enum": ["SPECIFIC", "ALL"]
+    },
+    "select": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "FARMER_NAME",
+          "FARMER_ID",
+          "QUANTITY",
+          "FAT",
+          "SNF",
+          "PAYMENT_STATUS",
+          "PAYMENT_METHOD",
+          "PAYMENT_REFERENCE",
+          "PAYMENT_TIMESTAMP",
+          "PAYABLE_AMOUNT",
+          "AMOUNT_PAID",
+          "CREATED_AT",
+          "UPDATED_AT",
+          "UPLOAD_STATUS"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "filters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["field", "op", "value", "secondaryValue"],
+        "properties": {
+          "field": {
+            "type": "string",
+            "enum": [
+              "FARMER_NAME",
+              "FARMER_ID",
+              "QUANTITY",
+              "FAT",
+              "SNF",
+              "PAYMENT_STATUS",
+              "PAYMENT_METHOD",
+              "PAYMENT_REFERENCE",
+              "PAYMENT_TIMESTAMP",
+              "PAYABLE_AMOUNT",
+              "AMOUNT_PAID",
+              "CREATED_AT",
+              "UPDATED_AT",
+              "UPLOAD_STATUS"
+            ]
+          },
+          "op": {
+            "type": "string",
+            "enum": [
+              "EQUALS",
+              "NOT_EQUALS",
+              "GREATER_THAN",
+              "GREATER_OR_EQUAL",
+              "LESS_THAN",
+              "LESS_OR_EQUAL",
+              "IS_NULL",
+              "IS_NOT_NULL",
+              "CONTAINS",
+              "IN_RANGE"
+            ]
+          },
+          "value": {
+            "type": ["string", "null"]
+          },
+          "secondaryValue": {
+            "type": ["string", "null"]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "filterLogic": {
+      "type": "string",
+      "enum": ["AND", "OR"]
+    },
+    "time": {
+      "type": ["object", "null"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["RELATIVE", "EXPLICIT_DATE", "EXPLICIT_RANGE"]
+        },
+        "period": {
+          "type": ["string", "null"],
+          "enum": [
+            "TODAY",
+            "YESTERDAY",
+            "THIS_WEEK",
+            "LAST_WEEK",
+            "THIS_MONTH",
+            "LAST_MONTH",
+            "SINCE_MONDAY",
+            "LAST_SUNDAY",
+            null
+          ]
+        },
+        "date": {
+          "type": ["string", "null"]
+        },
+        "startDate": {
+          "type": ["string", "null"]
+        },
+        "endDate": {
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "aggregations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "field"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "SUM",
+              "COUNT_RECORDS",
+              "COUNT_DISTINCT_FARMERS",
+              "AVG",
+              "MIN",
+              "MAX"
+            ]
+          },
+          "field": {
+            "type": ["string", "null"],
+            "enum": [
+              "QUANTITY",
+              "FAT",
+              "SNF",
+              "PAYABLE_AMOUNT",
+              "AMOUNT_PAID",
+              null
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "groupBy": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "FARMER_NAME",
+          "FARMER_ID",
+          "PAYMENT_STATUS",
+          "PAYMENT_METHOD",
+          "UPLOAD_STATUS"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "havingFilter": {
+      "type": ["object", "null"],
+      "properties": {
+        "agg": {
+          "type": "string",
+          "enum": [
+            "SUM",
+            "COUNT_RECORDS",
+            "COUNT_DISTINCT_FARMERS",
+            "AVG",
+            "MIN",
+            "MAX"
+          ]
+        },
+        "field": {
+          "type": "string",
+          "enum": [
+            "QUANTITY",
+            "FAT",
+            "SNF",
+            "PAYABLE_AMOUNT",
+            "AMOUNT_PAID"
+          ]
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "GREATER_THAN",
+            "GREATER_OR_EQUAL",
+            "LESS_THAN",
+            "LESS_OR_EQUAL",
+            "EQUALS"
+          ]
+        },
+        "value": {
+          "type": "number"
+        }
+      },
+      "required": ["agg", "field", "op", "value"],
+      "additionalProperties": false
+    },
+    "orderBy": {
+      "type": ["object", "null"],
+      "properties": {
+        "target": {
+          "type": "string",
+          "enum": ["FIELD", "AGGREGATE"]
+        },
+        "field": {
+          "type": ["string", "null"]
+        },
+        "aggregation": {
+          "type": ["string", "null"],
+          "enum": [
+            "SUM",
+            "COUNT_RECORDS",
+            "COUNT_DISTINCT_FARMERS",
+            "AVG",
+            "MIN",
+            "MAX",
+            null
+          ]
+        },
+        "dir": {
+          "type": "string",
+          "enum": ["ASC", "DESC"]
+        }
+      },
+      "required": ["target", "dir"],
+      "additionalProperties": false
+    },
+    "limit": {
+      "type": ["integer", "null"],
+      "minimum": 1
+    },
+    "exists": {
+      "type": "boolean"
+    },
+    "paymentScope": {
+      "type": "string",
+      "enum": ["LATEST", "ALL", "ANY"]
+    },
+    "conditionalSpec": {
+      "type": ["object", "null"],
+      "properties": {
+        "conditionField": {
+          "type": "string",
+          "enum": ["PAYMENT_STATUS", "UPLOAD_STATUS"]
+        },
+        "expectedValue": {
+          "type": "string"
+        },
+        "fieldsOnMatch": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "fieldsOnMismatch": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["conditionField", "expectedValue", "fieldsOnMatch", "fieldsOnMismatch"],
+      "additionalProperties": false
+    },
+    "writeArgs": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "knowledgeQuery": {
+      "type": ["string", "null"]
+    },
+    "reason": {
+      "type": ["string", "null"]
+    }
+  },
+  "additionalProperties": false
+}

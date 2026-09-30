@@ -1,0 +1,183 @@
+{
+  "contractVersion": "2.0.0-frozen",
+  "modelTarget": "Qwen3-1.7B-Instruct",
+  "runtimeEngine": "LiteRT-LM / MediaPipe GenAI",
+  "fields": {
+    "FARMER_NAME": {
+      "type": "STRING",
+      "roomColumn": "farmerName",
+      "selectable": true,
+      "filterable": true,
+      "groupable": true,
+      "sortable": true,
+      "numeric": false
+    },
+    "FARMER_ID": {
+      "type": "STRING",
+      "roomColumn": "farmerId",
+      "selectable": true,
+      "filterable": true,
+      "groupable": true,
+      "sortable": false,
+      "numeric": false
+    },
+    "QUANTITY": {
+      "type": "DOUBLE",
+      "roomColumn": "quantity",
+      "unit": "L",
+      "selectable": true,
+      "filterable": true,
+      "groupable": false,
+      "sortable": true,
+      "numeric": true,
+      "supportedAggregations": ["SUM", "AVG", "MIN", "MAX"]
+    },
+    "FAT": {
+      "type": "DOUBLE",
+      "roomColumn": "fat",
+      "unit": "%",
+      "selectable": true,
+      "filterable": true,
+      "groupable": false,
+      "sortable": true,
+      "numeric": true,
+      "supportedAggregations": ["AVG", "MIN", "MAX"]
+    },
+    "SNF": {
+      "type": "DOUBLE",
+      "roomColumn": "snf",
+      "unit": "%",
+      "selectable": true,
+      "filterable": true,
+      "groupable": false,
+      "sortable": true,
+      "numeric": true,
+      "supportedAggregations": ["AVG", "MIN", "MAX"]
+    },
+    "PAYMENT_STATUS": {
+      "type": "STRING",
+      "roomColumn": "paymentStatus",
+      "validValues": ["PENDING", "RECORDED_LOCALLY", "PAID"],
+      "selectable": true,
+      "filterable": true,
+      "groupable": true,
+      "sortable": true,
+      "numeric": false
+    },
+    "PAYMENT_METHOD": {
+      "type": "STRING",
+      "roomColumn": "paymentMethod",
+      "validValues": ["CASH", "UPI", "BANK_TRANSFER", "OTHER"],
+      "selectable": true,
+      "filterable": true,
+      "groupable": true,
+      "sortable": true,
+      "numeric": false
+    },
+    "PAYMENT_REFERENCE": {
+      "type": "STRING",
+      "roomColumn": "paymentReference",
+      "selectable": true,
+      "filterable": true,
+      "groupable": false,
+      "sortable": false,
+      "numeric": false
+    },
+    "PAYMENT_TIMESTAMP": {
+      "type": "LONG",
+      "roomColumn": "paymentTimestamp",
+      "unit": "epoch_ms",
+      "selectable": true,
+      "filterable": true,
+      "groupable": false,
+      "sortable": true,
+      "numeric": false,
+      "temporal": true
+    },
+    "PAYABLE_AMOUNT": {
+      "type": "DOUBLE",
+      "roomColumn": "payableAmount",
+      "unit": "INR",
+      "selectable": true,
+      "filterable": true,
+      "groupable": false,
+      "sortable": true,
+      "numeric": true,
+      "supportedAggregations": ["SUM", "AVG", "MIN", "MAX"]
+    },
+    "AMOUNT_PAID": {
+      "type": "DOUBLE",
+      "roomColumn": "amountPaid",
+      "unit": "INR",
+      "selectable": true,
+      "filterable": true,
+      "groupable": false,
+      "sortable": true,
+      "numeric": true,
+      "supportedAggregations": ["SUM", "AVG", "MIN", "MAX"]
+    },
+    "CREATED_AT": {
+      "type": "LONG",
+      "roomColumn": "createdAt",
+      "unit": "epoch_ms",
+      "selectable": true,
+      "filterable": true,
+      "groupable": false,
+      "sortable": true,
+      "numeric": false,
+      "temporal": true
+    },
+    "UPDATED_AT": {
+      "type": "LONG",
+      "roomColumn": "updatedAt",
+      "unit": "epoch_ms",
+      "selectable": true,
+      "filterable": true,
+      "groupable": false,
+      "sortable": true,
+      "numeric": false,
+      "temporal": true
+    },
+    "UPLOAD_STATUS": {
+      "type": "STRING",
+      "roomColumn": "uploadStatus",
+      "validValues": ["PENDING", "UPLOADED"],
+      "selectable": true,
+      "filterable": true,
+      "groupable": true,
+      "sortable": true,
+      "numeric": false
+    }
+  },
+  "authorizationScopeInvariants": {
+    "orgId": "Deterministically injected by Kotlin runtime from authenticated WorkerProfile.organizationId; LLM cannot select or override.",
+    "workerId": "Deterministically injected by Kotlin runtime from authenticated WorkerProfile.workerId; LLM cannot select or override."
+  },
+  "aggregations": {
+    "COUNT_RECORDS": "Counts distinct individual collection records matching query filter. Field must be null.",
+    "COUNT_DISTINCT_FARMERS": "Counts distinct authoritative non-null farmerIds contributing matching records. Field must be null.",
+    "SUM": "Sums numeric metric (QUANTITY, PAYABLE_AMOUNT, AMOUNT_PAID).",
+    "AVG": "Calculates arithmetic mean of numeric metric (QUANTITY, FAT, SNF, PAYABLE_AMOUNT, AMOUNT_PAID).",
+    "MIN": "Returns minimum numeric value.",
+    "MAX": "Returns maximum numeric value."
+  },
+  "temporalTokens": {
+    "RELATIVE": [
+      "TODAY",
+      "YESTERDAY",
+      "THIS_WEEK",
+      "LAST_WEEK",
+      "THIS_MONTH",
+      "LAST_MONTH",
+      "SINCE_MONDAY",
+      "LAST_SUNDAY"
+    ],
+    "EXPLICIT_DATE": "ISO YYYY-MM-DD or DD/MM/YYYY string resolved to [startOfDay, endOfDay] by Kotlin",
+    "EXPLICIT_RANGE": "Pair of date strings resolved to inclusive range [startMs, endMs] by Kotlin"
+  },
+  "paymentScopes": {
+    "LATEST": "Evaluates latest recorded matching payment record",
+    "ALL": "Evaluates all matching records (verifies 100% completed)",
+    "ANY": "Evaluates whether at least one matching record is paid"
+  }
+}
