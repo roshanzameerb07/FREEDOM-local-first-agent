@@ -224,7 +224,56 @@ The project includes an extensive test suite across 11 test classes covering 89+
 
 ---
 
-## 13. License & Contribution
+
+
+## 14. Bring Your Own Model (BYOM)
+
+FREEDOM supports importing a compatible local `.litertlm` model as a replacement for the built-in Qwen3-1.7B. This is a **real administrative capability** managed by an `ORG_ADMIN` user.
+
+### What is currently implemented
+
+| Capability | Status |
+|-----------|--------|
+| SAF file picker (`.litertlm`) | ✅ Implemented |
+| SHA-256 integrity check (computed locally) | ✅ Implemented |
+| Private storage placement (`filesDir/freedom_models/`) | ✅ Implemented |
+| Real LiteRT-LM inference from file path | ✅ Implemented |
+| Compatibility check (controlled test prompt + parser validation) | ✅ Implemented |
+| Model activation / deactivation | ✅ Implemented |
+| Model removal (file + manifest, no Room data impact) | ✅ Implemented |
+| Organization scoping (organizationId from session, never from model) | ✅ Implemented |
+| Role-based access (ORG_ADMIN only, FIELD_WORKER never sees model terms) | ✅ Implemented |
+
+### How it works
+
+1. **Admin navigates** to `Settings -> Local Models` (Admin tab in bottom nav, ORG_ADMIN only)
+2. **Taps "Import Local Model"** - Android file picker opens
+3. **Selects a `.litertlm` file** - copied to FREEDOM private storage + SHA-256 computed
+4. **Taps "Check Compatibility"** - FREEDOM sends a controlled test query to the model and validates output matches FREEDOM query format
+5. **Taps "Activate"** - model becomes the active inference provider
+6. **Workers continue using the app normally** - the model change is invisible to FIELD_WORKER
+
+### Worker experience
+
+The FIELD_WORKER user sees:
+- No model names, technical terms, or framework status
+- The same operational interface regardless of which model is active
+- Human-readable errors if inference fails (not stack traces)
+
+### Security guarantees
+
+- `organizationId` always comes from the authenticated session - never from model output or file metadata
+- The model cannot influence authorization, user identity, or permissions
+- Only COMPATIBLE models (verified by real inference test) can be activated
+- Removing a model never deletes any operational (Room) data
+
+### Planned (not yet implemented)
+
+- Persistence of model manifests across app restarts (currently in-memory only)
+- Multiple simultaneous registered models with named switching
+- ORGANIZATION_PROVIDED model pre-configuration at org setup
+
+## 15. License & Contribution
 
 - **License:** Apache License 2.0.
 - **Contributions:** Pull requests are welcomed on feature branches following the deterministic DSL and local-first architecture guidelines.

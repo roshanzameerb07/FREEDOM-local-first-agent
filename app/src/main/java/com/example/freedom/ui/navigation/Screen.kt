@@ -7,4 +7,5 @@ sealed class Screen(val route: String, val title: String) {
     object LocalRecords : Screen("local_records", "Local Records")
     object AskFreedom : Screen("ask_freedom", "Ask FREEDOM")
     object Sync : Screen("sync", "Batch Sync (Simulation)")
+    object AdminLocalModels : Screen("admin_local_models", "Local Models")
 }

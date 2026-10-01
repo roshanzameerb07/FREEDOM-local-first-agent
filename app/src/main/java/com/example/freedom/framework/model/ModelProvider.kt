@@ -51,6 +51,7 @@ interface ModelProvider {
 
 /**
  * Metadata about a model provider.
+ * Includes extended BYOM fields for imported local models.
  */
 data class ModelInfo(
     /** Unique model identifier */
@@ -74,7 +75,7 @@ data class ModelInfo(
     /** Whether the model is currently active */
     val isActive: Boolean = true,
 
-    /** Backend used (e.g., CPU, GPU) */
+    /** Backend used (e.g., CPU, GPU, LiteRT-LM) */
     val backend: String = "CPU",
 
     /** Initialization time in milliseconds */
@@ -84,5 +85,31 @@ data class ModelInfo(
     val lastInferenceTimeMs: Long = 0L,
 
     /** Last error message, if any */
-    val lastError: String? = null
+    val lastError: String? = null,
+
+    // --- BYOM extended fields (null for FREEDOM-provided models) ---
+
+    /** Model source (FREEDOM_PROVIDED, USER_IMPORTED, ORGANIZATION_PROVIDED) */
+    val source: ModelSource? = null,
+
+    /** Runtime type (LITERT_LM or UNKNOWN) */
+    val runtimeType: ModelRuntimeType? = null,
+
+    /** Artifact format type (LITERTLM or UNKNOWN) */
+    val artifactType: ModelArtifactType? = null,
+
+    /** Original file name from the picker */
+    val fileName: String? = null,
+
+    /** File size in bytes */
+    val fileSize: Long? = null,
+
+    /** SHA-256 hex digest, computed at import time */
+    val sha256: String? = null,
+
+    /** Organization that imported this model */
+    val organizationId: String? = null,
+
+    /** Compatibility check result */
+    val compatibilityStatus: ModelCompatibilityStatus? = null
 )
