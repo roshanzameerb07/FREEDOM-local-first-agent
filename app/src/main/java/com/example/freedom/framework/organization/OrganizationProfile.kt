@@ -89,6 +89,8 @@ enum class ModelProviderType {
     FREEDOM_PROVIDED,
     /** Model provided by the organization itself */
     ORGANIZATION_PROVIDED,
+    /** Model imported by an admin/user from local storage */
+    USER_IMPORTED,
     /** No model available — deterministic fallback only */
     NONE
 }

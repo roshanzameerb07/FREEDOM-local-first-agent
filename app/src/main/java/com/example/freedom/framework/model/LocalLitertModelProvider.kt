@@ -41,7 +41,11 @@ class LocalLitertModelProvider(
 
     override val providerId: String = manifest.modelId
     override val displayName: String = manifest.displayName
-    override val providerType: ModelProviderType = ModelProviderType.ORGANIZATION_PROVIDED
+    override val providerType: ModelProviderType = when (manifest.source) {
+        ModelSource.FREEDOM_PROVIDED -> ModelProviderType.FREEDOM_PROVIDED
+        ModelSource.ORGANIZATION_PROVIDED -> ModelProviderType.ORGANIZATION_PROVIDED
+        ModelSource.USER_IMPORTED -> ModelProviderType.USER_IMPORTED
+    }
 
     @Volatile
     private var engine: Engine? = null
@@ -166,7 +170,7 @@ class LocalLitertModelProvider(
     override fun getModelInfo(): ModelInfo = ModelInfo(
         modelId = manifest.modelId,
         displayName = manifest.displayName,
-        providerType = ModelProviderType.ORGANIZATION_PROVIDED,
+        providerType = providerType,
         artifactPath = manifest.localPath,
         contextLength = manifest.contextLength,
         outputContract = manifest.semanticContract,

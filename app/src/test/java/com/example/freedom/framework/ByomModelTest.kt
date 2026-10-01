@@ -108,22 +108,91 @@ class ByomModelTest {
     }
 
     // ==========================================
-    // PHASE 7: ModelCompatibilityChecker logic (pure extraction)
+    // PHASE 7: ModelCompatibilityChecker logic (FreedomQuery DSL evaluation)
     // ==========================================
 
     @Test
-    fun `ModelCompatibilityChecker extractJson finds JSON in noisy output`() {
-        // Access via reflection since extractJson is private — test the public surface instead
-        // This test validates the intent logic by testing full compatible JSON strings.
-        val validOutputs = listOf(
-            """{"intent": "GET_TODAY_SUMMARY", "args": {}, "needsConfirmation": false}""",
-            """Sure! Here's the JSON: {"intent": "COUNT_FARMERS_COVERED", "args": {"period": "today"}, "needsConfirmation": false}""",
-            """```json\n{"intent": "GET_TODAY_SUMMARY", "args": {}}\n```"""
+    fun `ModelCompatibilityChecker evaluates valid FreedomQuery DSL response as COMPATIBLE`() {
+        val validFreedomQueryJson = """
+            {
+              "type": "QUERY",
+              "target": "MILK_RECORDS",
+              "entity": null,
+              "entityScope": "ALL",
+              "select": ["QUANTITY"],
+              "filters": [],
+              "filterLogic": "AND",
+              "time": {
+                "type": "RELATIVE",
+                "period": "TODAY"
+              },
+              "aggregations": [
+                { "type": "COUNT_DISTINCT_FARMERS", "field": null }
+              ],
+              "groupBy": []
+            }
+        """.trimIndent()
+
+        val evaluation = ModelCompatibilityChecker.evaluateFreedomQueryOutput(validFreedomQueryJson)
+        assertTrue("Valid FreedomQuery DSL output should be compatible", evaluation.isCompatible)
+        assertNotNull(evaluation.query)
+        assertEquals(com.example.freedom.domain.query.RequestType.QUERY, evaluation.query?.requestType)
+        assertEquals(com.example.freedom.domain.query.QueryTarget.MILK_RECORDS, evaluation.query?.target)
+    }
+
+    @Test
+    fun `ModelCompatibilityChecker evaluates legacy ToolIntent response as INCOMPATIBLE`() {
+        val legacyIntentJson = """
+            {
+              "intent": "GET_TODAY_SUMMARY",
+              "args": {},
+              "needsConfirmation": false
+            }
+        """.trimIndent()
+
+        val evaluation = ModelCompatibilityChecker.evaluateFreedomQueryOutput(legacyIntentJson)
+        assertFalse("Legacy ToolIntent output must be rejected as INCOMPATIBLE with FreedomQuery DSL", evaluation.isCompatible)
+    }
+
+    @Test
+    fun `ModelCompatibilityChecker evaluates UNSUPPORTED response as INCOMPATIBLE`() {
+        val unsupportedJson = """
+            {
+              "type": "UNSUPPORTED",
+              "reason": "Not available in local database"
+            }
+        """.trimIndent()
+
+        val evaluation = ModelCompatibilityChecker.evaluateFreedomQueryOutput(unsupportedJson)
+        assertFalse("UNSUPPORTED query response should fail compatibility test", evaluation.isCompatible)
+    }
+
+    @Test
+    fun `LocalLitertModelProvider maps providerType from manifest source`() {
+        val baseManifest = LocalModelManifest(
+            modelId = "m-test",
+            displayName = "Test Provider",
+            source = ModelSource.USER_IMPORTED,
+            runtimeType = ModelRuntimeType.LITERT_LM,
+            artifactType = ModelArtifactType.LITERTLM,
+            localPath = "/fake/path.litertlm",
+            fileName = "test.litertlm",
+            fileSize = 100L,
+            sha256 = "1234",
+            organizationId = "ORG001"
         )
-        // We can verify these contain an intent by simple string check
-        for (output in validOutputs) {
-            assertTrue("Should contain intent key", output.contains("\"intent\""))
-        }
+
+        val userImportedProvider = LocalLitertModelProvider(baseManifest.copy(source = ModelSource.USER_IMPORTED))
+        assertEquals(com.example.freedom.framework.organization.ModelProviderType.USER_IMPORTED, userImportedProvider.providerType)
+        assertEquals(com.example.freedom.framework.organization.ModelProviderType.USER_IMPORTED, userImportedProvider.getModelInfo().providerType)
+
+        val orgProvidedProvider = LocalLitertModelProvider(baseManifest.copy(source = ModelSource.ORGANIZATION_PROVIDED))
+        assertEquals(com.example.freedom.framework.organization.ModelProviderType.ORGANIZATION_PROVIDED, orgProvidedProvider.providerType)
+        assertEquals(com.example.freedom.framework.organization.ModelProviderType.ORGANIZATION_PROVIDED, orgProvidedProvider.getModelInfo().providerType)
+
+        val freedomProvidedProvider = LocalLitertModelProvider(baseManifest.copy(source = ModelSource.FREEDOM_PROVIDED))
+        assertEquals(com.example.freedom.framework.organization.ModelProviderType.FREEDOM_PROVIDED, freedomProvidedProvider.providerType)
+        assertEquals(com.example.freedom.framework.organization.ModelProviderType.FREEDOM_PROVIDED, freedomProvidedProvider.getModelInfo().providerType)
     }
 
     // ==========================================

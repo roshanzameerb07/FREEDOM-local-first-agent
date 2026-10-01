@@ -1,6 +1,10 @@
 package com.example.freedom.framework.model
 
 import android.util.Log
+import com.example.freedom.domain.query.FreedomQuery
+import com.example.freedom.domain.query.QueryValidator
+import com.example.freedom.domain.query.QwenQueryParser
+import com.example.freedom.domain.query.RequestType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -9,17 +13,18 @@ import kotlinx.coroutines.withContext
  *
  * Compatibility is determined by:
  * 1. Initializing the provider (loading the model file)
- * 2. Sending a controlled FREEDOM test prompt
- * 3. Parsing the output through [com.example.freedom.domain.query.QwenQueryParser]
- * 4. Verifying the result is a non-null, non-UNSUPPORTED FreedomQuery
+ * 2. Sending a controlled FREEDOM test prompt using the CURRENT frozen FreedomQuery DSL system prompt
+ * 3. Parsing the output through [QwenQueryParser.parseJsonResponse]
+ * 4. Validating the resulting [FreedomQuery] with [QueryValidator.validate]
+ * 5. Verifying the query is valid and not UNSUPPORTED
  *
  * A model that cannot load → LOAD_FAILED
- * A model that loads but produces invalid output → INCOMPATIBLE
- * A model that loads and produces a parseable FREEDOM query → COMPATIBLE
+ * A model that loads but produces invalid FreedomQuery output → INCOMPATIBLE
+ * A model that loads and produces a valid FreedomQuery → COMPATIBLE
  *
  * Design Principles:
- * - The test uses a controlled, deterministic query — not user input
- * - The check is real inference, not a mock
+ * - The test uses a controlled, deterministic query against the frozen FreedomQuery DSL
+ * - The check is real inference, not a mock or legacy ToolIntent
  * - Only COMPATIBLE models may be activated
  * - INCOMPATIBLE models remain in storage but cannot run queries
  */
@@ -29,14 +34,15 @@ object ModelCompatibilityChecker {
 
     /**
      * A controlled test query sent to the model during compatibility check.
-     * This is a real dairy-domain question that should produce a GET_TODAY_SUMMARY intent.
+     * Tests the canonical dairy collection query contract against the frozen FreedomQuery DSL.
      */
-    private const val TEST_QUERY = "How many farmers delivered milk today?"
+    const val TEST_QUERY = "How many farmers delivered milk today?"
 
     data class CompatibilityCheckResult(
         val status: ModelCompatibilityStatus,
         val reason: String,
-        val rawOutput: String? = null
+        val rawOutput: String? = null,
+        val parsedQuery: FreedomQuery? = null
     )
 
     /**
@@ -65,8 +71,8 @@ object ModelCompatibilityChecker {
                 )
             }
 
-            // Step 2: Build a system prompt identical to what QwenQueryParser would use
-            val testPrompt = buildCompatibilityTestPrompt(TEST_QUERY)
+            // Step 2: Build the full prompt using the frozen FreedomQuery DSL system prompt
+            val testPrompt = "${QwenQueryParser.buildSystemPrompt()}\n\nUser Question: \"$TEST_QUERY\"\nJSON Output:"
 
             // Step 3: Run inference
             val rawOutput = try {
@@ -84,108 +90,110 @@ object ModelCompatibilityChecker {
                 )
             }
 
-            // Step 4: Attempt to parse the output as FreedomQuery JSON
-            val parseResult = tryParseFreedomOutput(rawOutput)
+            // Step 4: Parse through the current QwenQueryParser and validate with QueryValidator
+            val parseResult = evaluateFreedomQueryOutput(rawOutput, TEST_QUERY)
 
             return@withContext if (parseResult.isCompatible) {
                 Log.i(TAG, "Compatibility check PASSED for model: ${provider.providerId}")
                 CompatibilityCheckResult(
                     status = ModelCompatibilityStatus.COMPATIBLE,
-                    reason = "Model passed the FREEDOM query compatibility test.",
-                    rawOutput = rawOutput
+                    reason = "Model passed the FreedomQuery DSL compatibility test.",
+                    rawOutput = rawOutput,
+                    parsedQuery = parseResult.query
                 )
             } else {
                 Log.w(TAG, "Compatibility check FAILED: ${parseResult.failureReason}")
                 CompatibilityCheckResult(
                     status = ModelCompatibilityStatus.INCOMPATIBLE,
-                    reason = parseResult.failureReason ?: "Output did not match the FREEDOM query format.",
-                    rawOutput = rawOutput
+                    reason = parseResult.failureReason ?: "Output did not conform to the FreedomQuery DSL contract.",
+                    rawOutput = rawOutput,
+                    parsedQuery = parseResult.query
                 )
             }
         }
 
     /**
-     * Build a minimal FREEDOM system prompt for the compatibility test.
-     * This mirrors the format used by QwenQueryParser.buildSystemPrompt().
+     * Parse and validate model output against the current frozen FreedomQuery DSL.
      */
-    private fun buildCompatibilityTestPrompt(userQuery: String): String {
-        return """You are FREEDOM, a local-first AI agent for a dairy cooperative.
-Analyze the user request and output ONLY valid JSON, nothing else.
+    fun evaluateFreedomQueryOutput(rawOutput: String, userQuery: String = TEST_QUERY): ParseEvaluation {
+        val trimmed = rawOutput.trim()
+        val jsonClean = if (trimmed.contains("```json")) {
+            trimmed.substringAfter("```json").substringBefore("```").trim()
+        } else if (trimmed.contains("```")) {
+            trimmed.substringAfter("```").substringBefore("```").trim()
+        } else {
+            val start = trimmed.indexOf('{')
+            val end = trimmed.lastIndexOf('}')
+            if (start != -1 && end != -1 && end > start) trimmed.substring(start, end + 1) else trimmed
+        }
 
-JSON structure:
-{
-  "intent": "<CAPABILITY_NAME>",
-  "args": {},
-  "needsConfirmation": false
-}
-
-Capabilities: CREATE_MILK_RECORD, GET_FARMER_HISTORY, GET_PENDING_PAYMENTS, GET_TODAY_SUMMARY, GET_WORKER_PROFILE, COUNT_FARMERS_COVERED, GET_ORGANIZATION_INFO, SEARCH_LOCAL_KNOWLEDGE, ASK_CLARIFICATION, UNKNOWN_OR_UNSUPPORTED
-
-User request: $userQuery""".trimIndent()
-    }
-
-    /**
-     * Try to parse model output as a FreedomQuery-compatible JSON object.
-     * Returns a result indicating whether parsing succeeded.
-     */
-    private fun tryParseFreedomOutput(rawOutput: String): ParseResult {
-        return try {
-            // Extract JSON from output (model may wrap in markdown or prose)
-            val json = extractJson(rawOutput)
-                ?: return ParseResult(false, "No JSON found in model output.")
-
-            val trimmed = json.trim()
-            if (!trimmed.startsWith("{")) {
-                return ParseResult(false, "Output is not a JSON object.")
-            }
-
-            // Check for required fields
-            if (!trimmed.contains("\"intent\"")) {
-                return ParseResult(false, "JSON missing required 'intent' field.")
-            }
-
-            // Check that intent is one of the known capabilities (not empty or garbage)
-            val knownIntents = setOf(
-                "CREATE_MILK_RECORD", "GET_FARMER_HISTORY", "GET_PENDING_PAYMENTS",
-                "GET_TODAY_SUMMARY", "GET_WORKER_PROFILE", "GET_TODAY_WORKER_SUMMARY",
-                "GET_WEEKLY_WORKER_SUMMARY", "COUNT_FARMERS_COVERED", "GET_ORGANIZATION_INFO",
-                "SEARCH_LOCAL_KNOWLEDGE", "ASK_CLARIFICATION", "UNKNOWN_OR_UNSUPPORTED"
-            )
-            val hasKnownIntent = knownIntents.any { intent ->
-                trimmed.contains("\"$intent\"")
-            }
-
-            if (!hasKnownIntent) {
-                return ParseResult(false, "Intent value is not a recognized FREEDOM capability.")
-            }
-
-            ParseResult(isCompatible = true)
+        val jsonObject = try {
+            org.json.JSONObject(jsonClean)
         } catch (e: Exception) {
-            ParseResult(false, "Parse error: ${e.message}")
+            return ParseEvaluation(
+                isCompatible = false,
+                failureReason = "Output is not valid JSON: ${e.message}"
+            )
         }
+
+        // Must conform to current FreedomQuery schema, NOT legacy ToolIntent schema
+        if (jsonObject.has("intent") && !jsonObject.has("type") && !jsonObject.has("target")) {
+            return ParseEvaluation(
+                isCompatible = false,
+                failureReason = "Model returned legacy ToolIntent format instead of FreedomQuery DSL schema."
+            )
+        }
+
+        if (!jsonObject.has("type") && !jsonObject.has("target")) {
+            return ParseEvaluation(
+                isCompatible = false,
+                failureReason = "Model output missing required FreedomQuery DSL fields ('type' or 'target')."
+            )
+        }
+
+        val parsedQuery = try {
+            QwenQueryParser.parseJsonResponse(rawOutput, userQuery)
+        } catch (e: Exception) {
+            return ParseEvaluation(
+                isCompatible = false,
+                failureReason = "Failed to parse model output as FreedomQuery JSON: ${e.message}"
+            )
+        }
+
+        if (parsedQuery == null) {
+            return ParseEvaluation(
+                isCompatible = false,
+                failureReason = "Model output could not be parsed into a valid FreedomQuery object."
+            )
+        }
+
+        if (parsedQuery.requestType == RequestType.UNSUPPORTED) {
+            return ParseEvaluation(
+                isCompatible = false,
+                query = parsedQuery,
+                failureReason = "Model returned UNSUPPORTED for standard field query: ${parsedQuery.unsupportedReason}"
+            )
+        }
+
+        val validation = QueryValidator.validate(parsedQuery)
+        if (!validation.isValid) {
+            val errorSummary = validation.errors.joinToString("; ")
+            return ParseEvaluation(
+                isCompatible = false,
+                query = parsedQuery,
+                failureReason = "FreedomQuery failed validation: $errorSummary"
+            )
+        }
+
+        return ParseEvaluation(
+            isCompatible = true,
+            query = parsedQuery
+        )
     }
 
-    /**
-     * Extract the first JSON object from a potentially noisy model response.
-     */
-    private fun extractJson(text: String): String? {
-        val start = text.indexOf('{')
-        if (start == -1) return null
-        var depth = 0
-        for (i in start until text.length) {
-            when (text[i]) {
-                '{' -> depth++
-                '}' -> {
-                    depth--
-                    if (depth == 0) return text.substring(start, i + 1)
-                }
-            }
-        }
-        return null
-    }
-
-    private data class ParseResult(
+    data class ParseEvaluation(
         val isCompatible: Boolean,
+        val query: FreedomQuery? = null,
         val failureReason: String? = null
     )
 }
