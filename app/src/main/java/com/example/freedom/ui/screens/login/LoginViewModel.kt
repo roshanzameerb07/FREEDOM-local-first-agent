@@ -10,9 +10,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
 data class LoginUiState(
-    val orgId: String = "ORG001",
-    val workerId: String = "WORKER001",
-    val password: String = "1234",
+    val orgId: String = AuthRepository.HACKATHON_DEMO_ORG_ID,
+    val workerId: String = AuthRepository.HACKATHON_DEMO_WORKER_ID,
+    val password: String = AuthRepository.HACKATHON_DEMO_PASSWORD,
     val errorMessage: String? = null,
     val isLoading: Boolean = false,
     val loggedInUser: AuthUser? = null
@@ -50,6 +50,17 @@ class LoginViewModel(
             onSuccess()
         }.onFailure { error ->
             _uiState.update { it.copy(errorMessage = error.message ?: "Authentication failed") }
+        }
+    }
+
+    fun fillHackathonDemoCredentials() {
+        _uiState.update {
+            it.copy(
+                orgId = AuthRepository.HACKATHON_DEMO_ORG_ID,
+                workerId = AuthRepository.HACKATHON_DEMO_WORKER_ID,
+                password = AuthRepository.HACKATHON_DEMO_PASSWORD,
+                errorMessage = null
+            )
         }
     }
 

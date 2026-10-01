@@ -1,5 +1,6 @@
 package com.example.freedom.ui.navigation
 
+import android.app.Application
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -8,6 +9,7 @@ import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -17,9 +19,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.freedom.data.local.FreedomDatabase
 import com.example.freedom.data.repository.AuthRepository
 import com.example.freedom.data.repository.MilkRecordRepositoryImpl
+import com.example.freedom.framework.security.Permission
+import com.example.freedom.framework.session.SessionManager
 import com.example.freedom.theme.CardBackground
 import com.example.freedom.theme.PrimaryGreen
 import com.example.freedom.theme.TextSecondary
+import com.example.freedom.ui.screens.admin.LocalModelsScreen
+import com.example.freedom.ui.screens.admin.LocalModelsViewModel
 import com.example.freedom.ui.screens.ask.AskFreedomScreen
 import com.example.freedom.ui.screens.ask.AskFreedomViewModel
 import com.example.freedom.ui.screens.collection.RecordCollectionScreen
@@ -65,7 +71,18 @@ fun FreedomApp() {
         navigateBack()
     }
 
-    val showBottomBar = currentScreen != Screen.Login && currentScreen != Screen.Sync
+    val showBottomBar = currentScreen != Screen.Login
+            && currentScreen != Screen.Sync
+            && currentScreen != Screen.AdminLocalModels
+
+    // Check if current user can access admin features (role-based, from session)
+    val canManageModels by remember {
+        derivedStateOf {
+            SessionManager.getCurrentSessionOrNull()
+                ?.currentUser
+                ?.hasPermission(Permission.MANAGE_MODEL_PROVIDER) == true
+        }
+    }
 
     Scaffold(
         bottomBar = {
@@ -128,6 +145,23 @@ fun FreedomApp() {
                             unselectedTextColor = TextSecondary
                         )
                     )
+
+                    // Admin nav item — only visible to users with MANAGE_MODEL_PROVIDER permission
+                    if (canManageModels) {
+                        NavigationBarItem(
+                            selected = currentScreen == Screen.AdminLocalModels,
+                            onClick = { navigateTo(Screen.AdminLocalModels) },
+                            icon = { Icon(Icons.Default.Settings, contentDescription = "Admin") },
+                            label = { Text("Admin") },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = PrimaryGreen,
+                                selectedTextColor = PrimaryGreen,
+                                indicatorColor = PrimaryGreen.copy(alpha = 0.15f),
+                                unselectedIconColor = TextSecondary,
+                                unselectedTextColor = TextSecondary
+                            )
+                        )
+                    }
                 }
             }
         }
@@ -162,6 +196,9 @@ fun FreedomApp() {
                         onNavigateToLocalRecords = { navigateTo(Screen.LocalRecords) },
                         onNavigateToAskFreedom = { navigateTo(Screen.AskFreedom) },
                         onNavigateToSync = { navigateTo(Screen.Sync) },
+                        onNavigateToAdmin = if (canManageModels) {
+                            { navigateTo(Screen.AdminLocalModels) }
+                        } else null,
                         onLogout = {
                             backStack.clear()
                             navigateTo(Screen.Login)
@@ -211,6 +248,24 @@ fun FreedomApp() {
                         viewModel = syncViewModel,
                         onNavigateBack = { navigateBack() }
                     )
+                }
+
+                is Screen.AdminLocalModels -> {
+                    // Double-check at render time: only MANAGE_MODEL_PROVIDER users reach here
+                    if (canManageModels) {
+                        val adminViewModel: LocalModelsViewModel = viewModel(
+                            factory = LocalModelsViewModel.Factory(
+                                application = LocalContext.current.applicationContext as Application
+                            )
+                        )
+                        LocalModelsScreen(
+                            viewModel = adminViewModel,
+                            onNavigateBack = { navigateBack() }
+                        )
+                    } else {
+                        // Unauthorized: navigate back silently
+                        LaunchedEffect(Unit) { navigateBack() }
+                    }
                 }
             }
         }

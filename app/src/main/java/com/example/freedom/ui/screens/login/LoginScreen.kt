@@ -271,17 +271,30 @@ fun LoginScreen(
                 Column(
                     modifier = Modifier.padding(14.dp)
                 ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Hackathon Demo Credentials:",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = OnPrimaryContainer
+                        )
+                        TextButton(
+                            onClick = { viewModel.fillHackathonDemoCredentials() },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text("Reset Demo", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = PrimaryGreen)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "Demo Credentials (Unambiguous Testing):",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = OnPrimaryContainer
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "• Org: ORG001  |  Worker: WORKER001  |  Pass: 1234",
+                        text = "• Org: FREEDOM-DEMO-001\n• Worker: DEMO-FIELD-01  (Role: FIELD_WORKER)\n• Password: FreedomDemo@2026",
                         style = MaterialTheme.typography.bodySmall,
-                        color = OnPrimaryContainer
+                        color = OnPrimaryContainer,
+                        lineHeight = 18.sp
                     )
                 }
             }

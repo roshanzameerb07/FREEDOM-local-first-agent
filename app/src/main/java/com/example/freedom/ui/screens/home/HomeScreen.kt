@@ -23,6 +23,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.freedom.domain.model.WorkerProfileRepository
+import com.example.freedom.framework.security.UserRole
+import com.example.freedom.framework.session.SessionManager
 import com.example.freedom.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -33,6 +35,7 @@ fun HomeScreen(
     onNavigateToLocalRecords: () -> Unit,
     onNavigateToAskFreedom: () -> Unit,
     onNavigateToSync: () -> Unit,
+    onNavigateToAdmin: (() -> Unit)? = null,
     onLogout: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -133,7 +136,78 @@ fun HomeScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Framework status bar — only shown to ORG_ADMIN (Phase 11: FIELD_WORKER sees clean UI)
+            val activeSession = SessionManager.getCurrentSessionOrNull()
+            val isAdmin = activeSession?.currentUser?.role == UserRole.ORG_ADMIN
+
+            if (isAdmin) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = CardBackground,
+                    shape = RoundedCornerShape(10.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, OutlineColor)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val activeOrg = com.example.freedom.framework.organization.OrganizationRegistry.getActiveProfileOrNull()
+                        val activeModel = com.example.freedom.framework.model.ModelProviderRegistry.getActiveModelInfo()
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Business,
+                                contentDescription = null,
+                                tint = PrimaryGreen,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = activeOrg?.organizationId ?: "ORG001",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                            Text(
+                                text = " • ${activeSession?.currentUser?.role?.displayName ?: "Admin"}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary
+                            )
+                        }
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Memory,
+                                contentDescription = null,
+                                tint = InfoBlue,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = activeModel?.displayName?.split(" ")?.firstOrNull() ?: "Qwen3",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = InfoBlue
+                            )
+                            if (onNavigateToAdmin != null) {
+                                Spacer(modifier = Modifier.width(10.dp))
+                                TextButton(
+                                    onClick = onNavigateToAdmin,
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Text("Manage", style = MaterialTheme.typography.labelSmall, color = PrimaryGreen)
+                                }
+                            }
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(14.dp))
+            } else {
+                Spacer(modifier = Modifier.height(4.dp))
+            }
 
             // Officer Welcome Header
             uiState.currentUser?.let { user ->
@@ -252,6 +326,26 @@ fun HomeScreen(
                 containerColor = CardBackground,
                 onClick = onNavigateToSync
             )
+
+            // Admin shortcut — only shown to ORG_ADMIN (FIELD_WORKER never sees this)
+            if (isAdmin && onNavigateToAdmin != null) {
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = "Administration",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                FieldActionCard(
+                    title = "Local Models",
+                    subtitle = "Import, check compatibility, and manage on-device AI models",
+                    icon = Icons.Default.Settings,
+                    badgeText = "Admin",
+                    containerColor = CardBackground,
+                    onClick = onNavigateToAdmin
+                )
+            }
         }
     }
 

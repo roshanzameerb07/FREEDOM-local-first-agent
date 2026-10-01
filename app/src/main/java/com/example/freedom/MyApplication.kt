@@ -21,6 +21,9 @@ class MyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
+        // Initialize FREEDOM framework (organization profile + model provider registration)
+        com.example.freedom.framework.FreedomFramework.initialize()
+
         val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         val memInfo = ActivityManager.MemoryInfo()
         activityManager.getMemoryInfo(memInfo)
@@ -42,22 +45,19 @@ class MyApplication : Application() {
                 var modelFile = File(filesDir, "qwen3-1.7b-int4.litertlm")
                 
                 if (!modelFile.exists() || modelFile.length() < 300_000_000L) {
-                    val fallbackAsset = "Qwen3-1.7B_dynamic_wi4b32_afp32.litertlm"
                     val primaryAsset = "qwen3-1.7b-int4.litertlm"
                     
-                    val assetToUse = if (assets.list("")?.contains(primaryAsset) == true) {
-                        primaryAsset
-                    } else {
-                        fallbackAsset
-                    }
-
-                    Log.i("MyApplication", "Extracting Qwen3 model asset ($assetToUse) to filesDir...")
-                    assets.open(assetToUse).use { input ->
-                        FileOutputStream(modelFile).use { output ->
-                            input.copyTo(output)
+                    if (assets.list("")?.contains(primaryAsset) == true) {
+                        Log.i("MyApplication", "Extracting Qwen3 model asset ($primaryAsset) to filesDir...")
+                        assets.open(primaryAsset).use { input ->
+                            FileOutputStream(modelFile).use { output ->
+                                input.copyTo(output)
+                            }
                         }
+                        Log.i("MyApplication", "Model extracted to ${modelFile.absolutePath} (${modelFile.length()} bytes)")
+                    } else {
+                        Log.w("MyApplication", "Canonical model $primaryAsset not found in assets. Relying on BYOM import.")
                     }
-                    Log.i("MyApplication", "Model extracted to ${modelFile.absolutePath} (${modelFile.length()} bytes)")
                 }
 
                 // Attempt GPU acceleration first, fallback to CPU
