@@ -16,6 +16,10 @@ android {
         versionName = "1.0"
     }
 
+    androidResources {
+        ignoreAssetsPattern = "!*.litertlm:*.litertlm"
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
